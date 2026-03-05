@@ -3,3 +3,6 @@ numpy
 asyncio
 scikit-learn
 structlog
+pydantic
+pydantic_settings
+pyyaml
