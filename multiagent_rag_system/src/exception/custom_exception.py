@@ -13,7 +13,7 @@ class MulitagentragException(Exception):
 
         exc_type = exc_value = exc_tb = None
         if error_details is None:
-            exc_type, exc_value, exc_tb = sys.exec_info()
+            exc_type, exc_value, exc_tb = sys.exc_info()
         
         else:
             if hasattr(error_details, 'exc_info'):
@@ -28,7 +28,7 @@ class MulitagentragException(Exception):
         
         last_tb = exc_tb
         while last_tb and last_tb.tb_next:
-            last_tb = last_tb.tb.next
+            last_tb = last_tb.tb_next
 
         self.file_name = last_tb.tb_frame.f_code.co_filename if last_tb else "<unknown>"
         self.lineno = last_tb.tb_lineno if last_tb else -1

@@ -29,6 +29,7 @@ auth:
   api_key_header: "X-API-Key"
 
 llm:
+  active_providers: 'groq'
   providers:
     groq: 
       model_name: 'deepseek-r1-distill-llama-7b'
