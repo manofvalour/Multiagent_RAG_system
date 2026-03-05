@@ -1,0 +1,4 @@
+ipykernel
+numpy
+asyncio
+scikit-learn
