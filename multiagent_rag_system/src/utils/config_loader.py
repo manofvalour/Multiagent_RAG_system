@@ -174,9 +174,9 @@ def get_settings()-> Settings:
 
 if __name__ == "__main__":
     try:
-        config = _load_yaml()
+        config = get_settings()
 
-        print(config)
+        print(config.model_json_schema)
         logger.info("ConfigLoader test run completed succesfully")
     except Exception as e:
         raise MulitagentragException("failed to load the config file")
