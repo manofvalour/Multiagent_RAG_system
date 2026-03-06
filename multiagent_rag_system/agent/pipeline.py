@@ -167,9 +167,44 @@ class ConsensusAgent:
     async def run(self,
                 query:str, chunks: list[RetrievedChunk]
               )-> tuple[str, list[str], AgentEvent]:
-        to = time.perf_counter()
+        try:
+            t0 = time.perf_counter()
 
+            results = await asyncio.gather(
+                *[g.run(query,chunks) for g in self.generators], 
+                return_exceptions=True,
+            )
+            answers = [r[0] for r in results if isinstance(r, tuple)]
+
+            if not answers:
+                return "Unable to generate consensus answer.", [], \
+                _timed_event(self.NAME, AgentStatus.FAILED, "All generators failed", t0)
+            
+            word_freq: Counter = Counter()
+            for ans in answers:
+                word_freq.update(_word_text(ans))
+
+            best= max(answers, key=lambda a: sum(word_freq[w] for w in _word_text(a)))
+            event = _timed_event(
+                self.NAME, AgentStatus.DONE,
+                f"Consensus from {len(answers)} candidates",
+                t0, n_candidates = len(answers), best_len=len(best),
+            )
+            logger.info('Consensus_complete', **event.metadata)
+            return best, answers, event
         
+        except Exception as e:
+            logger.error(f"Consensus agent failed", error=str(e))
+            raise MulitagentragException("Consus Agent failed! ", error_details=str(e))
+        
+class ClaimmVerificationAgent:
+    pass
+
+class ConfidenceScoringAgent:
+    pass
+
+class MultiAgentRAGPipeline:
+    pass
 
 
 
