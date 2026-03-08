@@ -197,14 +197,189 @@ class ConsensusAgent:
             logger.error(f"Consensus agent failed", error=str(e))
             raise MulitagentragException("Consus Agent failed! ", error_details=str(e))
         
-class ClaimmVerificationAgent:
-    pass
+class ClaimVerificationAgent:
+    """
+    Splits the answer into atomic claims (sentences) and verifies each against retrieved chunks via
+    LLM-assisted entailment check. Fails back to lexical overlap
+    when LLM is unavailable.
+    """
+    NAME = "ClaimVerification"
 
+    VERIFY_SYSTEM = """You are a fact_checking assistant. Given a CLAIM and a list of SOURCE passages,
+    determine if the CLAIM is directly supported by the sources,
+    Respond with ONLY valid JSON: {"supported": true/false, "confidence": 0.0 - 1.0, "reason":"one Sentence"}
+    No extra text, no markdown.
+    """
+
+    def __init__(self, llm: Optional[BaseLLMClient]=None, use_llm:bool=True):
+        self.llm=llm or get_llm_client()
+        self.use_llm = use_llm
+
+    def _split_claims(self, text: str)-> list[str]:
+        """ Split text into atomic sentence-level claims."""
+        sentences = re.split(r"(?<=[.!?])\s+", text.strip())
+        return [s.strip() for s in sentences if len(s.strip())> 15]
+    
+    async def _verify_one_llm(self, claim: str, chunks: list[RetrievedChunk])->tuple[bool, float]:
+        sources = "\n".join(
+            f"[{i+1}] {rc.chunk.content[:200]}" for i,rc in enumerate(chunks[:4])
+        )
+        user_msg =f"CLAIM: {claim}\n\nSOURCES:\n{sources}"
+        try:
+            resp = await self.llm.complete(system=self.VERIFY_SYSTEM, user=user_msg, temperature=0.0)
+            import json as _json
+            data = _json.loads(resp.text.strip())
+            return bool(data.get("supported")), float(data.get("confidence", 0.5))
+        
+        except Exception:
+            return self._verify_lexical(claim,chunks)
+        
+    def _verify_lexical(self, claim: str, chunks: list[RetrievedChunk])->tuple[bool, float]:
+        best = max(
+            (_overlap_ratio(claim, rc.chunk.content) for rc in chunks),
+            default=0.0,
+        )
+        supported = best>= settings.claim_support_threshold
+        return supported, min(1.0, best*2)
+    
+    async def run(
+            self, answer: str, chunks: list[RetrievedChunk]
+    ) -> tuple[list[Claim], AgentEvent]:
+        t0 = time.perf_counter()
+        sentences = self._split_claims(answer)
+
+        if not sentences:
+            return [], _timed_event(self.NAME, AgentStatus.DONE, "No claims extracted", t0)
+        
+        ## verify all claims concurrently
+        verify_tasks = [
+            self._verify_one_llm(s,chunks) if self.use_llm
+            else asyncio.coroutine(lambda s=s: self._verify_lexical(s, chunks))()
+            for s in sentences
+        ]
+        results = await asyncio.gather(*verify_tasks, return_exceptions=True)
+
+        claims: list[Claim] = []
+        for sentence, result in zip(sentences, results):
+            if isinstance(result, Exception):
+                supported, confidence = self._verify_lexical(sentence,chunks)
+            else:
+                supported, confidence = result
+            supporting = [rc for rc in chunks if _overlap_ratio(sentence, rc.chunk.content)> 0.15]
+            claims.append(Claim(
+                text=sentence, supported = supported,
+                confidenc=round(confidence, 3), supporting_chunks = supporting[:2],
+            ))
+        
+        n_supported = sum(1 for c in claims if c.supported)
+        event = _timed_event(
+            self.NAME, AgentStatus.DONE,
+            f"{n_supported}/{len(claims)} claims supported",
+            t0, total=len(claims), supported = n_supported,
+            unsupported=len(claims) - n_supported,
+        )
+        logger.info("Claim_verification", **event.metadata)
+        return claims, event
 class ConfidenceScoringAgent:
-    pass
+    """
+    Computes a final [0,1] confidence score and assigns a hallucination risk
+    level using a wighted combination fo three orthogonal signals
+    """
+
+    NAME = "ConfidenceScorer"
+    WEIGHTS = {"claim_support": 0.50, "avg_relevance":0.30, "source_overlap":0.20}
+
+    async def run(
+            self, answer: str, claims: list[Claim], chunks: list[RetrievedChunk]
+    ) -> tuple[ConfidenceBreakdown, HallucinationRisk, AgentEvent]:
+        t0 = time.perf_counter()
+
+        claim_support = (
+            sum(1 for c in claims if c.supported)/max(len(claims), 1)
+        )
+        avg_relevance = (
+            sum(rc.relevance_score for rc in chunks)/ max(len(chunks),1)
+        )
+
+        src_text = " ".join(rc.chunk.content for rc in chunks)
+        source_overlap = _overlap_ratio(answer, src_text)
+
+        final = (
+            self.WEIGHTS["claim_support"] * claim_support
+            +self.WEIGHTS['avg_relevance'] * avg_relevance
+            + self.WEIGHTS['source_overlap']* source_overlap
+        )
+        final = round(min(1.0, max(0.0, final)),4)
+
+        if final >= settings.confidence_low_threshold:
+            risk = HallucinationRisk.LOW
+        elif final>= settings.confidence_medium_threshold:
+            risk = HallucinationRisk.MEDIUM
+        else:
+            risk = HallucinationRisk.HIGH
+
+        breakdown = ConfidenceBreakdown(
+            claim_support=round(claim_support, 4),
+            avg_relevance = round(avg_relevance, 4),
+            source_overlap=round(source_overlap, 4),
+            final= final,
+        )
+        event = _timed_event(
+            self.NAME, AgentStatus.DONE,
+            f"Confidence={final:.3f}, Risk={risk.value}",
+            t0, **breakdown.model_dump(),
+        )
+        logger.info("confidence_score", **event.metadata)
+        return breakdown, risk, event
 
 class MultiAgentRAGPipeline:
-    pass
+    """
+    Orchestrates the full 5-agent pipeline.
+    Agents 4+5 run concurrently after generation.
+    """
+    def __init__(self):
+        self.validator = RetrievalValidationAgent()
+        self.consensus = ConsensusAgent()
+        self.verifier = ClaimVerificationAgent()
+        self.scorer = ConfidenceScoringAgent()
+
+    async def run(
+            self, request: QueryRequest,
+            raw_chunks: list[RetrievedChunk],
+    )-> QueryResponse:
+        t_total = time.perf_counter()
+        trace: list[AgentEvent] = []
+
+        # Retrieval validation
+        validated,ev = await self.validator.run(request.query, raw_chunks)
+        trace.append(ev)
+
+        top_chunks = validated[: settings.top_k_after_rerank]
+
+        # Consensus Generation
+        answer, all_answers, ev = await self.consensus.run(request.query, top_chunks)
+        trace.append(ev)
+
+        # Claim verification and confidence scoring (running concurrently)
+        (claims, ev_claims), (breakdown, risk, ev_score) = await asyncio.gather(
+            self.verifier.run(answer, top_chunks),
+            self.scorer.run(answer, [], top_chunks),
+        )
+        trace.extend([ev_claims, ev_score])
+
+        breakdown, risk, ev_final = await self.scorer.run(answer, claims, top_chunks)
+        trace.append(ev_final)
+
+        return QueryResponse(
+            query=request.query,
+            answer=answer,
+            claims = claims,
+            retrieved_chunks=top_chunks,
+            confidence = breakdown,
+            hallucination_risk = risk,
+            latency_ms=round((time.perf_counter()- t_total)*1000, 2),
+            agent_trace=trace if request.include_trace else [],
+        )
 
 
 
