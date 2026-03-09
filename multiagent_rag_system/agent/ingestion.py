@@ -10,12 +10,12 @@ import time
 import uuid
 from typing import Optional
 
-from core.config import get_settings
-from src.logger.logger import GLOBAL_LOGGER as logger
-from core.models import ChunkStrategy, DocumentChunk, IngestRequest, IngestResponse
-from core.vector_store import get_embedder, get_vector_store
+from ..src.utils.config_loader import get_settings
+from ..src.logger.logger import GLOBAL_LOGGER as logger
+from ..src.models.models import ChunkStrategy, DocumentChunk, IngestRequest, IngestResponse
+from ..src.database.vector_store import get_embedder, get_vector_store
 
-logger = get_logger(__name__)
+
 settings = get_settings()
 
 

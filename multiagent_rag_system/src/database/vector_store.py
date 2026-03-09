@@ -8,6 +8,8 @@ import uuid
 from abc import ABC, abstractmethod
 from typing import Optional
 import numpy as np
+import sentence-transformers
+import hashlib
 
 from ..utils.config_loader import get_settings
 from ..logger import GLOBAL_LOGGER as logger
@@ -234,19 +236,19 @@ class FAISSVectorStore(VectorStoreBase):
         _store: Optional[FAISSVectorStore]=None
         _embedder: Optional[EmbeddingProvider]= None
 
-        async def get_vector_stor()-> FAISSVectorStore:
-            global _store
-            if _store is None:
-                _store = FAISSVectorStore()
-                await _store.initialize()
+async def get_vector_store()-> FAISSVectorStore:
+    global _store
+    if _store is None:
+        _store = FAISSVectorStore()
+        await _store.initialize()
 
-            return _store
-        
-        async def get_embedder()-> EmbeddingProvider:
-            global _embedder
-            if _embedder is None:
-                _embedder is EmbeddingProvider()
-                await _embedder._load()
+    return _store
 
-            return _embedder
+async def get_embedder()-> EmbeddingProvider:
+    global _embedder
+    if _embedder is None:
+        _embedder is EmbeddingProvider()
+        await _embedder._load()
+
+    return _embedder
 
