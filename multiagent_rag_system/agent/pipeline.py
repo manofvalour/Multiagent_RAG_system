@@ -18,9 +18,9 @@ from ..src.llm.llm import BaseLLMClient, LLMResponse, get_llm_client
 """ Things to buid
         - Retrieval Validation Agent (Done)
         - Answer Generator Agent (Done)
-        - Consensus Agent
-        - Claim Verification Agent
-        - Confidence Score Agent
+        - Consensus Agent (Done)
+        - Claim Verification Agent (Done)
+        - Confidence Score Agent (Done)
 """
 settings = get_settings()
 
@@ -51,7 +51,7 @@ def _timed_event(agent:str, status: AgentStatus,
 
 class RetrievalValidationAgent:
     """
-    Combines vector similarity with keyword overlap for a blended relevance score.
+    Combines vector similarity with keyword overlap for a more defined relevance score.
     Drops chunks below threshold to prevent context poisoning
     """
 
@@ -241,6 +241,9 @@ class ClaimVerificationAgent:
         )
         supported = best>= settings.claim_support_threshold
         return supported, min(1.0, best*2)
+
+    async def _lexical_async(self, claim: str, chunks: list[RetrievedChunk]):
+        return self._verify_lexical(claim, chunks)
     
     async def run(
             self, answer: str, chunks: list[RetrievedChunk]
@@ -254,7 +257,7 @@ class ClaimVerificationAgent:
         ## verify all claims concurrently
         verify_tasks = [
             self._verify_one_llm(s,chunks) if self.use_llm
-            else asyncio.coroutine(lambda s=s: self._verify_lexical(s, chunks))()
+            else self._lexical_async(s, chunks)()
             for s in sentences
         ]
         results = await asyncio.gather(*verify_tasks, return_exceptions=True)
@@ -280,6 +283,7 @@ class ClaimVerificationAgent:
         )
         logger.info("Claim_verification", **event.metadata)
         return claims, event
+    
 class ConfidenceScoringAgent:
     """
     Computes a final [0,1] confidence score and assigns a hallucination risk

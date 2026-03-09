@@ -6,3 +6,5 @@ structlog
 pydantic
 pydantic_settings
 pyyaml
+httpx
+tenacity
