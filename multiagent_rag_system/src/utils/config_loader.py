@@ -55,9 +55,10 @@ class Environment(str, Enum):
 
 class LLMProvider(str, Enum):
     ANTHROPIC = 'anthropic' 
-    OPENAI = 'openai'
     GROQ = 'groq'
-    GOOGLE = 'google'
+
+class SystemPrompt(str, Enum):
+    SYSTEMPROMPT= ""
 
 class VectorStoreType(str, Enum):
     FAISS = 'faiss'
@@ -66,7 +67,8 @@ class VectorStoreType(str, Enum):
 
 class LLMProviderConfig(BaseModel):
     """ Config for a single LLM Provider."""
-    model_name:str
+    base_url: str = "https://api.groq.com/openai/v1/chat/completions"
+    model_name:str = 'openai/gpt-oss-120b'
     temperature: float = Field(default=0.0, ge=0.0, le=2.0)
     max_output_tokens: int = Field(default=2048, ge=1)
     timeout_seconds: int = Field(default=30, ge=1)
@@ -117,18 +119,15 @@ class Settings(BaseSettings):
 
     ## LLM
     active_provider: LLMProvider = LLMProvider.GROQ
+    system_prompt:SystemPrompt = SystemPrompt.SYSTEMPROMPT
 
     llm_providers: dict[str, LLMProviderConfig]= {
         'anthropic': LLMProviderConfig(model_name ="Claude-sonnet-4-20250514"),
-        'openai': LLMProviderConfig(model_name='gpt-4o'),
-        'groq': LLMProviderConfig(model_name='deepseek-r1-distill-llama-7b'),
-        'google': LLMProviderConfig(model_name='gemini-2.0-flash'),
+        'groq': LLMProviderConfig(model_name='openai/gpt-oss-120b'),
     }
 
-    anthropic_api_key: SecretStr = Field(default="")
-    openai_api_key: SecretStr = Field(default="")
-    groq_api_key: SecretStr = Field(default = "")
-    google_api_key: SecretStr = Field(default="")
+    anthropic_api_key: SecretStr = Field(default="", alias= "ANTHROPIC_API_KEY")
+    groq_api_key: SecretStr = Field(default = "", alias = "GROQ_API_KEY")
 
     ## Embeddings
     embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
@@ -142,7 +141,7 @@ class Settings(BaseSettings):
     top_k_after_rerank: int =5
 
     ## Agents
-    consensus_n_agents: int =3
+    consensus_n_agents: int =5
     retrieval_relevance_threshold: float = 0.12
     claim_support_threshold: float =0.20
     confidence_low_threshold: float =0.65

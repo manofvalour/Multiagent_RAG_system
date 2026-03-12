@@ -25,3 +25,7 @@ aiofiles
 pytest
 pytest-asyncio
 locust
+llama_index
+langgraph
+langchain
+langchain_text_splitters

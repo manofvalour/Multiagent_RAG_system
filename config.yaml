@@ -1,0 +1,36 @@
+
+# config.yaml — all non-secret defaults live here
+retriever:
+  top_k: 5                      # how many chunks to retrieve
+  similarity_threshold: 0.7     # minimum cosine similarity to include
+
+reranker:
+  enabled: true
+  top_n: 3                      # chunks kept after reranking
+  model: "BAAI/bge-reranker-v2-m3"
+
+generator:
+  provider: "groq" 
+  model: "openai/gpt-oss-120b"
+  temperature: 0.2
+  max_tokens: 1024
+  system_prompt: |
+    You are a precise, helpful assistant.
+    Answer the question using ONLY the provided context.
+    If the context does not contain the answer, say so clearly.
+
+embeddings:
+  model: "sentence-transformers/all-MiniLM-L6-v2"
+  batch_size: 64
+
+cache:
+  enabled: true
+  ttl_seconds: 3600             # cache answers for 1 hour
+  similarity_threshold: 0.92    # reuse cached answer if query is ≥92% similar
+
+vector_store:
+  index_path: "./faiss_index"
+  index_type: "Flat"            # "Flat" (exact) | "IVFFlat" (approx, faster at scale)
+
+logging:
+  level: "INFO"

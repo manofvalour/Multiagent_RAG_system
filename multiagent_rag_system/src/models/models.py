@@ -16,16 +16,16 @@ class AgentStatus(str,Enum):
     DONE = 'done'
     FAILED = 'failed'
 
-class ChunkStrategy(str, Enum):
-    FIXED = 'fixed'
-    SENTENCE = 'sentence'
-    SEMANTIC = 'semantic'
+
+class ContentType(str, Enum):
+    PROSE    = "prose"
+    MARKDOWN = "markdown"
+    CODE     = "code"
 
 class IngestRequest(BaseModel):
     content:str = Field(..., min_length =10, description ="Raw document text")
     source: str = Field(..., description= "Human-readable source label")
     metadata: dict[str, Any] = Field(default_factory=dict)
-    chunk_strategy: ChunkStrategy = ChunkStrategy.SENTENCE
     chunk_size: int = Field(default=512, ge=64, le=4096)
     chunk_overlap: int = Field(default=64, ge=0, le=512)
 

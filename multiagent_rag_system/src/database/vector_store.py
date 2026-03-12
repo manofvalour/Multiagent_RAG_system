@@ -8,13 +8,13 @@ import uuid
 from abc import ABC, abstractmethod
 from typing import Optional
 import numpy as np
-import sentence-transformers
+import sentence_transformers
 import hashlib
 
 from ..utils.config_loader import get_settings
 from ..logger import GLOBAL_LOGGER as logger
 from ..exception.custom_exception import MulitagentragException
-from ..models import DocumentChunk,RetrievedChunk
+from ..models.models import DocumentChunk,RetrievedChunk
 
 settings = get_settings()
 
@@ -46,7 +46,7 @@ class EmbeddingProvider:
             except Exception as e:
                 logger.warning("embedding_model_unavailable", error=str(e),
                                fallback = "hash_embedding")
-                raise MulitagentragException("Unable to load embedding model")
+                #raise MulitagentragException("Unable to load embedding model")
             
     async def embed(self, texts: list[str]) -> list[list[float]]:
         await self._load()
@@ -113,7 +113,6 @@ class FAISSVectorStore(VectorStoreBase):
     """
     In-pocess FAISS index with an append_only JSON Wal for persistence.
     """
-
     def __init__(self):
         self._index = None
         self._chunks: list[DocumentChunk]=[]
@@ -124,9 +123,8 @@ class FAISSVectorStore(VectorStoreBase):
 
     async def initialize(self)-> None:
         """
-        :oad or create FAISS index, replay WAL.
+        Load or create FAISS index, replay WAL.
         """
-
         async with self._lock:
             try:
                 import faiss
@@ -191,50 +189,50 @@ class FAISSVectorStore(VectorStoreBase):
                 for score, chunk in hits[:top_k]
             ]
         
-        async def delete_document(self, doc_id: str) -> int:
-            async with self._lock:
-                before = len(self._chunks)
-                self._chunks = [c for c in self._chunks if c.doc_id != doc_id]
-                removed = before - len(self._chunks)
-                if removed:
-                    await self._rebuild_index()
-                return removed
-            
-        async def count(self) -> int:
-            return len(self._chunks)
+    async def delete_document(self, doc_id: str) -> int:
+        async with self._lock:
+            before = len(self._chunks)
+            self._chunks = [c for c in self._chunks if c.doc_id != doc_id]
+            removed = before - len(self._chunks)
+            if removed:
+                await self._rebuild_index()
+            return removed
         
-        async def _persist(self) -> None:
-            if self._index is None:
-                return 
-            
-            try: 
-                import faiss
-                loop = asyncio.get_event_loop()
-                await loop.run_in_executor(None, faiss.write_index, self._index, settings.faiss_index_path)
-                with open(settings.faiss_index_path + ".meta", 'wb') as f:
-                    pickle.dump(self._chunks, f)
+    async def count(self) -> int:
+        return len(self._chunks)
+    
+    async def _persist(self) -> None:
+        if self._index is None:
+            return 
+        
+        try: 
+            import faiss
+            loop = asyncio.get_event_loop()
+            await loop.run_in_executor(None, faiss.write_index, self._index, settings.faiss_index_path)
+            with open(settings.faiss_index_path + ".meta", 'wb') as f:
+                pickle.dump(self._chunks, f)
 
-            except Exception as e:
-                logger.error("faiss_persist_failed", error=str(e))
-                raise MulitagentragException("FAISS persist failed")
-            
-        async def _rebuild_index(self)-> None:
-            try:
-                import faiss
-                dim = settings.embedding_dim
-                self._index = faiss.IndexFlatIP(dim)
-                if self._chunks:
-                    emb=np.array([c.embedding for c in self._chunks], dtype=np.float32)
-                    self._index.add(emb)
-                self._id_to_pos = {c.id:i for i, c in enumerate(self._chunks)}
-                await self._persist()
+        except Exception as e:
+            logger.error("faiss_persist_failed", error=str(e))
+            raise MulitagentragException("FAISS persist failed")
+        
+    async def _rebuild_index(self)-> None:
+        try:
+            import faiss
+            dim = settings.embedding_dim
+            self._index = faiss.IndexFlatIP(dim)
+            if self._chunks:
+                emb=np.array([c.embedding for c in self._chunks], dtype=np.float32)
+                self._index.add(emb)
+            self._id_to_pos = {c.id:i for i, c in enumerate(self._chunks)}
+            await self._persist()
 
-            except Exception as e:
-                logger.error("faiss_rebuild_failed", error= str(e))
-                raise MulitagentragException("Failed to Rebuild FAISS", e)
+        except Exception as e:
+            logger.error("faiss_rebuild_failed", error= str(e))
+            raise MulitagentragException("Failed to Rebuild FAISS", e)
             
-        _store: Optional[FAISSVectorStore]=None
-        _embedder: Optional[EmbeddingProvider]= None
+_store: Optional[FAISSVectorStore]=None
+_embedder: Optional[EmbeddingProvider]= None
 
 async def get_vector_store()-> FAISSVectorStore:
     global _store
@@ -247,7 +245,7 @@ async def get_vector_store()-> FAISSVectorStore:
 async def get_embedder()-> EmbeddingProvider:
     global _embedder
     if _embedder is None:
-        _embedder is EmbeddingProvider()
+        _embedder = EmbeddingProvider()
         await _embedder._load()
 
     return _embedder

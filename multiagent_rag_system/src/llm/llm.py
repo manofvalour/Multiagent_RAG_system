@@ -1,3 +1,5 @@
+
+
 from __future__ import annotations
 import asyncio
 import time
@@ -8,9 +10,9 @@ from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_excep
 
 from ..utils.config_loader import get_settings
 from ..logger import GLOBAL_LOGGER as logger
+from ..exception.custom_exception import MulitagentragException
 
 settings = get_settings()
-cfg = settings.active_llm
 
 class LLMResponse:
     def __init__(self, text:str, input_tokens:int =0, output_tokens:int=0,
@@ -31,104 +33,83 @@ class BaseLLMClient(ABC):
     @abstractmethod
     async def health_check(self) -> bool: ...
 
-class AnthropicClient(BaseLLMClient):
-    BASE_URL = "https://api.anthropic.com/v1/messages"
 
-    def __init__(self):
-        key = settings.anthropic_api_key.get_secret_value()
-        self._headers = {
-            "x-api-key": key,
-            "anthropic-version": "2023-06-01",
-            "content-type": "application/json",
-        }
-        self._client = httpx.AsyncClient(timeout=settings.llm_timeout_seconds)
+class LLMLoader(BaseLLMClient):
+    """
+    Loading the LLM needed for the project
+    """
+    def __init__(self, llm_model:str):
+        self.llm_config = settings.llm_providers[llm_model]
+        self.base_url = self.llm_config.base_url
+
+        if llm_model =='anthropic':
+            self._headers = {
+                "x-api-key": settings.anthropic_api_key.get_secret_value(),
+                "anthropic-version": "2023-06-01",
+                "content-type": "application/json",
+            }
+
+        elif llm_model =='groq':
+            self._headers= {
+                "Authorization":f"Bearer {settings.openai_api_key.get_secret_value() 
+                                          if llm_model == "openai" 
+                                          else settings.groq_api_key.get_secret_value}",
+                "Content-Type": 'application/json'
+            }
+
+        self._client = httpx.AsyncClient(timeout=self.llm_config.timeout_seconds)
 
     @retry(
         stop= stop_after_attempt(3),
         wait = wait_exponential(multiplier=1, min=1, max=10),
-        retry = retry_if_exception_type(httpx.ConnectError, httpx.TimeoutException),
+        retry = retry_if_exception_type((httpx.ConnectError, httpx.TimeoutException)),
         reraise=True
     )
 
     async def complete(self, system:str, user:str, temperature: Optional[float]=None)-> LLMResponse:
-        t0 =time.perf_counter()
-        payload = {
-            "model": cfg.model_name,
-            "max_tokens": cfg.max_output_tokens,
-            "temperature": temperature if temperature is not None else cfg.temperature,
-            "system": system,
-            "messages": [{"role": "user", "content": user}],
-        }
+        try:
 
-        resp = await self._client.post(self.BASE_URL, headers=self._headers, json=payload)
-        resp.raise_for_status()
-        data = resp.json()
-        text = data["content"][0]["text"]
-        usage = data.get("usage", {})
-        return LLMResponse(
-            text= text,
-            input_tokens = usage.get("input_tokens", 0),
-            output_tokens = usage.get("output_tokens", 0),
-            latency_ms= (time.perf_counter() - t0)*1000,
-        )
+            t0 =time.perf_counter()
+            config = self.llm_config
+            payload = {
+                "model": config.model_name,
+                "max_tokens": config.max_output_tokens,
+                "temperature": temperature if temperature is not None else config.temperature,
+                "system": system,
+                "messages": [{"role": "user", "content": user}],
+            }
+
+            resp = await self._client.post(self.base_url, headers=self._headers, json=payload)
+            resp.raise_for_status()
+            data = resp.json()
+            model_name = config.model_name=='groq'
+            text =  data['choices'][0]["message"]["content"] if model_name else data["content"][0]["text"]
+            usage = data.get("usage", {})
+
+            logger.info("Model generation completed")
+
+
+            return LLMResponse(
+                text= text,
+                input_tokens = usage.get("input_tokens", 0),
+                output_tokens = usage.get("output_tokens", 0),
+                latency_ms= (time.perf_counter() - t0)*1000,
+            )
+        
+        except Exception as e:
+            logger.error("Unable to generate content", error= str(e))
+            raise MulitagentragException("Unable to generate content", e)
     
     async def health_check(self):
         try:
-            resp = await self._client.get("https://api.anthropic.com", timeout=5)
+            model_name = self.llm_config.model_name=='groq'
+            resp = await self._client.get("https://api.groq.com" if model_name else "https://api.anthropic.com", timeout=5)
             return resp.status_code < 500
         
-        except Exception:
-            return False
+        except Exception as e:
+            logger.error("Failed health check", error=str(e))
+            raise MulitagentragException("Failed health check", e)
         
-
-class OpenAIClient(BaseLLMClient):
-    BASE_URL = "https://api.openai.com/v1/chat/completions"
-    
-    def __init__(self):
-        key = settings.openai_api_key.get_secret_value()
-        self._headers= {
-            "Authorization":f"Bearer {key}",
-            "Content-Type": 'application/json'
-        }
-
-        self._client= httpx.AsyncClient(timeout= settings.llm_timeout_seconds)
-
-    @retry(
-        stop = stop_after_attempt(3),
-        wait = wait_exponential(multiplier=1, min=1, max=10),
-        retry= retry_if_exception_type(httpx.ConnectError, httpx.TimeoutException),
-        reraise=True
-    )
-
-    async def complete(self,system: str, user:str, temperature: Optional[float]=None)-> LLMResponse:
-        t0 = time.perf_counter()
-        payload = {
-            "model": cfg.model_name,
-            'max_tokens': cfg.max_output_tokens,
-            "messages": [{'role': 'system', "content": system}, {"role": "user", "content": user}]
-        }
-
-        resp = await self._client.post(self.BASE_URL, headers = self._headers, json=payload)
-        resp.raise_for_status()
-        data = resp.json()
-        text = data['choices'][0]["message"]['content']
-        usage = data.get("usage", {})
-        return LLMResponse(
-            text=text,
-            input_tokens= usage.get("prompt_tokens",0),
-            output_tokens = usage.get("completion_tokens", 0),
-            latency_ms = (time.perf_counter()- t0) *1000,
-        )
-    
-    async def health_check(self)-> bool:
-        try:
-            resp = await self._client.get("https://api.openai.com", timeout =5)
-            return resp.status_code<500
-        
-        except Exception:
-            return False
-        
-
 class SimulatedLLMClient(BaseLLMClient):
     """
     Deterministic simulated LLM for development and testing.
@@ -152,7 +133,7 @@ class SimulatedLLMClient(BaseLLMClient):
     
     async def health_check(self) -> bool:
         return True
-    
+
 
 _client_instance:Optional[BaseLLMClient]=None
 
@@ -161,15 +142,29 @@ def get_llm_client()-> BaseLLMClient:
     if _client_instance is not None:
         return _client_instance
     
-    provider =settings.llm_providers
-    if provider == "anthropic" and settings.anthropic_api_key.get_secret_value():
-        _client_instance= AnthropicClient()
-    elif provider == "openai" and settings.openai_api_key.get_secret_value():
-        _client_instance = OpenAIClient()
-
+    
     else:
-        logger.warning("llm_no_api_key", provider=provider, fallback='simulated')
-        _client_instance = SimulatedLLMClient()
+        provider = settings.active_provider
+        try:
+            _client_instance = LLMLoader()
+            logger.info("successfully loaded the model")
+
+        except Exception as e:
+            logger.warning("llm_model not available", provider = provider, fallback = "simulated")
+            _client_instance = SimulatedLLMClient()
 
     logger.info("llm_client_created", provider=type(_client_instance).__name__)
     return _client_instance
+
+
+
+if __name__ == "__main__":
+    try:
+        model = get_llm_client()
+
+        #print(config.model_json_schema)
+        print("we're live")
+        logger.info("ConfigLoader test run completed succesfully")
+    except Exception as e:
+        raise MulitagentragException("failed to load the config file")
+    

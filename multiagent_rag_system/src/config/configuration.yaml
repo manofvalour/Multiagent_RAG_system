@@ -18,10 +18,17 @@ database:
   db_max_overflow: 20
   db_pool_timeout: 30
 
+reranker:
+  enabled: true
+  top_n: 5                      # chunks kept after reranking
+  model: "BAAI/bge-reranker-v2-m3"
+
 redis:
   redis_url: 'redis://localhost:6379/0'
   cache_ttl_seconds: 3600
   session_ttl_second: 86400
+  enabled: true
+  similarity_threshold: 0.92    # reuse cached answer if query is ≥92% similar
 
 auth:
   jwt_algorithm: "HS256"
@@ -30,25 +37,20 @@ auth:
 
 llm:
   active_providers: 'groq'
+  system_prompt: |
+    You are a precise, helpful assistant.
+    Answer the question using ONLY the provided context.
+    If the context does not contain the answer, say so clearly.
+
   providers:
     groq: 
-      model_name: 'deepseek-r1-distill-llama-7b'
-      temperature: 0
+      base_url: "https://api.groq.com/openai/v1/chat/completions"
+      model_name: 'openai/gpt-oss-120b'
+      temperature: 0.2
       max_output_tokens: 2048
 
-      provider: 'google'
-      model_name: 'gemini-2.0-flash'
-      temperature: 0.0
-      max_output_tokens: 2048
-      timeout_seconds: 30
-
-      provider: 'openai'
-      model_name: "gpt-4o"
-      temperature: 0.0
-      max_output_tokens: 2048
-      timeout_seconds: 30
-
-      provider: anthropic
+    anthropic:
+      base_url: "https://api.anthropic.com/v1/messages"
       model_name: "claude-sonnet-4-20250514"
       max_output_tokens: 2048
       temperature: 0.0
@@ -67,7 +69,7 @@ vector_store:
 
 
 agents_info:
-  consensus_n_agents: 3
+  consensus_n_agents: 5
   retrieval_relevance_threshold: 0.12
   claim_support_threshold: 0.20
   confidence_low_threshold: 0.65
