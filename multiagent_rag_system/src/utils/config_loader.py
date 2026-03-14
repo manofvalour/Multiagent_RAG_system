@@ -145,7 +145,7 @@ class Settings(BaseSettings):
     retrieval_relevance_threshold: float = 0.12
     claim_support_threshold: float =0.20
     confidence_low_threshold: float =0.65
-    confidence_low_threshold: float=0.40
+    confidence_medium_threshold: float=0.40
 
     ## RAte Limiting
     rate_limit_requests: int =60

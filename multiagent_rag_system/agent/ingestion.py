@@ -8,7 +8,7 @@ import hashlib
 import time
 import uuid
 from typing import Optional
-from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain-text-splitters import RecursiveCharacterTextSplitter
 
 from ..src.utils.config_loader import get_settings
 from ..src.logger.logger import GLOBAL_LOGGER as logger

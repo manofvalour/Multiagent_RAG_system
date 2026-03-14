@@ -5,15 +5,15 @@ import time
 from collections import Counter
 from typing import Optional
 
-from ..src.utils.config_loader import get_settings
-from ..src.logger.logger import GLOBAL_LOGGER as logger
-from ..src.exception.custom_exception import MulitagentragException
-from ..src.models.models import (
+from src.utils.config_loader import get_settings
+from src.logger.logger import GLOBAL_LOGGER as logger
+from src.exception.custom_exception import MulitagentragException
+from src.models.models import (
     AgentEvent, AgentStatus, Claim, ConfidenceBreakdown,
     HallucinationRisk, QueryRequest, QueryResponse,
     RetrievedChunk,
     )
-from ..src.llm.llm import BaseLLMClient, LLMResponse, get_llm_client
+from src.llm.llm import BaseLLMClient, LLMResponse, get_llm_client
 
 """ Things to buid
         - Retrieval Validation Agent (Done)
@@ -93,8 +93,8 @@ class RetrievalValidationAgent:
 
 class AnswerGeneratorAgent:
     """
-    Generates answer based on the validated and retrieved. A single LLM call with a
-    structured system pompt emphasising grounded, citation_based, and refusal to 
+    Generates answer based on the validated retrieved. A single LLM call with a
+    structured system prompt emphasising grounded, citation_based, and refusal to 
     speculate beyond provided sources
 
     """
@@ -389,4 +389,5 @@ class MultiAgentRAGPipeline:
 
 
 if __name__=="__main__":
+    h = MultiAgentRAGPipeline()
     print('correct')

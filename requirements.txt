@@ -29,3 +29,4 @@ llama_index
 langgraph
 langchain
 langchain_text_splitters
+qdrant-client

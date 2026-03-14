@@ -6,9 +6,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from src.models.models import (
+from ..src.models.models import (
     DocumentChunk, QueryRequest, RetrievedChunk, HallucinationRisk
 )
+
 from agent.pipeline import (
     RetrievalValidationAgent, AnswerGeneratorAgent, ConsensusAgent,
     ClaimVerificationAgent, ConfidenceScoringAgent, MultiAgentRAGPipeline,

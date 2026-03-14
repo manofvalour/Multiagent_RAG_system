@@ -73,7 +73,7 @@ agents_info:
   retrieval_relevance_threshold: 0.12
   claim_support_threshold: 0.20
   confidence_low_threshold: 0.65
-  confidence_medium)threshold: 0.40
+  confidence_medium_threshold: 0.40
 
 rate_limiting:
   rate_limit_requests: 60

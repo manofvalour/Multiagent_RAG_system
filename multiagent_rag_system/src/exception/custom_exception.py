@@ -49,7 +49,7 @@ class MulitagentragException(Exception):
         return base
 
     def __repr__(self):
-        return f"MultiagentragException(file={self.file_name|r}, line={self.lineno}, message = {self.error_message})"
+        return f"MultiagentragException(file={self.file_name}, line={self.lineno}, message = {self.error_message})"
     
 if __name__ =="__main__":
     try:
