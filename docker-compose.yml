@@ -1,0 +1,68 @@
+version: "3.9"
+
+services:
+  api:
+    build: ./backend
+    ports: ["8000:8000"]
+    environment:
+      ENVIRONMENT: development
+      DATABASE_URL: postgresql+asyncpg://rag:rag@postgres:5432/ragdb
+      REDIS_URL: redis://redis:6379/0
+      LLM_PROVIDER: groq
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      FAISS_INDEX_PATH: /app/data/faiss.index
+    volumes:
+      - rag_data:/app/data
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis:    {condition: service_healthy}
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    ports: ["3000:3000"]
+    environment:
+      VITE_API_URL: http://localhost:8000
+    depends_on: [api]
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: rag
+      POSTGRES_PASSWORD: rag
+      POSTGRES_DB: ragdb
+    volumes: [pg_data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rag"]
+      interval: 5s; timeout: 5s; retries: 5
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --save 60 1 --loglevel warning
+    volumes: [redis_data:/data]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s; timeout: 5s; retries: 5
+
+  prometheus:
+    image: prom/prometheus:latest
+    ports: ["9090:9090"]
+    volumes:
+      - ./infra/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prom_data:/prometheus
+
+  grafana:
+    image: grafana/grafana:latest
+    ports: ["3001:3000"]
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./infra/grafana:/etc/grafana/provisioning
+
+volumes:
+  rag_data:
+  pg_data:
+  redis_data:
+  prom_data:
+  grafana_data:

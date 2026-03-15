@@ -39,10 +39,10 @@ try:
     INGESTION_TOTAL = Counter(
         "rag_ingestion_total", "Total documents ingested", registry=REGISTRY
     )
-    VECTOR_STORE_SIZE = Guage(
+    VECTOR_STORE_SIZE = Gauge(
         "rag_vector_store_chunks", "Current number of chunks in vector store", registry=REGISTRY
     )
-    ACTIVE_REQUESTS = Guage(
+    ACTIVE_REQUESTS = Gauge(
         "rag_active_reqests", "Current in_flight requests", registry=REGISTRY
     )
     PROMETHEUS_AVAILABLE = True
@@ -82,7 +82,7 @@ async def track_request():
         if PROMETHEUS_AVAILABLE and settings.enable_metrics:
             ACTIVE_REQUESTS.dec()
 
-def get_metris_output()-> bytes:
+def get_metrics_output()-> bytes:
     if not PROMETHEUS_AVAILABLE:
         return b"# Prometheus client not installed\n"
     
