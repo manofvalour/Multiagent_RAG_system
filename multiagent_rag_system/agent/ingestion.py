@@ -7,8 +7,9 @@ from __future__ import annotations
 import hashlib
 import time
 import uuid
+import re
 from typing import Optional
-from langchain-text-splitters import RecursiveCharacterTextSplitter
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from ..src.utils.config_loader import get_settings
 from ..src.logger.logger import GLOBAL_LOGGER as logger
@@ -75,6 +76,45 @@ class DocumentIngestionPipeline:
         chunks = splitter.split_text(text)
 
         return chunks
+
+    def _chunk_fixed(self, text: str, size: int, overlap: int) -> list[str]:
+        """Fixed-size chunking (same as _chunk) for test compatibility."""
+        return self._chunk(text, size, overlap)
+
+    def _chunk_sentences(self, text: str, max_words: int, overlap_words: int) -> list[str]:
+        """Chunk by sentence boundaries while obeying max word count and overlap."""
+        if not text:
+            return []
+
+        sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", text.strip()) if s.strip()]
+        if not sentences:
+            return []
+
+        chunks: list[str] = []
+        current_words: list[str] = []
+
+        def flush_current():
+            if current_words:
+                chunks.append(" ".join(current_words).strip())
+
+        for sentence in sentences:
+            words = sentence.split()
+            if len(current_words) + len(words) <= max_words:
+                current_words.extend(words)
+                continue
+
+            # flush what we have and start a new chunk, including overlap
+            flush_current()
+            overlap = current_words[-overlap_words:] if overlap_words > 0 else []
+            current_words = overlap + words
+
+            # if a single sentence is larger than max_words, still keep it
+            if len(current_words) > max_words:
+                flush_current()
+                current_words = []
+
+        flush_current()
+        return [c for c in chunks if c]
 
     @staticmethod
     def _chunk_id(doc_id: str, index: int, content: str) -> str:

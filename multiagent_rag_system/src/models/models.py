@@ -1,6 +1,6 @@
 from __future__ import annotations
 import uuid
-import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Optional
 from pydantic import BaseModel, Field, ConfigDict
@@ -45,7 +45,7 @@ class DocumentChunk(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
     chunk_index: int=0
     embedding: Optional[list[float]]=None
-    created_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(datetime.timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class RetrievedChunk(BaseModel):
     chunk: DocumentChunk
@@ -59,7 +59,7 @@ class AgentEvent(BaseModel):
     message: str
     duration_ms: float=0.0
     metadata: dict[str, Any] = Field(default_factory=dict)
-    timestamp: datetime.datetime = Field(default_factory= datetime.datetime.now(datetime.timezone.utc))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 ## claims
 class Claim(BaseModel):
@@ -67,7 +67,7 @@ class Claim(BaseModel):
     text: str
     supported: bool = False
     confidence: float = Field(ge=0.0, le=1.0, default=0.0)
-    supporting_chunks: list[RetrievedChunk] = Field(default_factory = list)
+    supporting_chunks: list[RetrievedChunk] = Field(default_factory=list)
 
 ## query pipeline
 class QueryRequest(BaseModel):
@@ -94,7 +94,7 @@ class QueryResponse(BaseModel):
     latency_ms: float
     agent_trace: list[AgentEvent] = Field(default_factory=list)
     cached: bool = False
-    created_at: datetime.datetime = Field(default_factory=datetime.datetime.now(datetime.timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 ## checking the health
 class HealthComponent(BaseModel):
@@ -137,5 +137,5 @@ class APIKeyResponse(BaseModel):
     id: str
     name: str
     key: str
-    created_at:datetime.datetime
-    expires_at: Optional[datetime.datetime]=None
+    created_at:datetime
+    expires_at: Optional[datetime]=None
