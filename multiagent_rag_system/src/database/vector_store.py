@@ -1,252 +1,304 @@
+"""
+Two connection modes (auto-detected from config):
+  Server mode — connects to a running Qdrant instance (local Docker or Qdrant Cloud)
+  Local mode  — in-process Qdrant stored on disk (no Docker needed, dev/test)
+
+Why Qdrant over FAISS?
+  - Full CRUD: delete individual points without rebuilding the entire index
+  - Native payload filtering: filter by source, doc_id, content_type at search time
+  - Built-in persistence: no manual save/load pickle files
+  - Qdrant Cloud: one env-var switch from local to managed cloud
+  - REST + gRPC API: queryable from any language / external tool
+  - HNSW index with configurable m and ef_construct at collection creation
+"""
+
 from __future__ import annotations
 import asyncio
-import json
-import os
-import pickle
-import time
 import uuid
-from abc import ABC, abstractmethod
 from typing import Optional
-import numpy as np
-import sentence_transformers
-import hashlib
 
 from ..utils.config_loader import get_settings
-from ..logger import GLOBAL_LOGGER as logger
-from ..exception.custom_exception import MulitagentragException
-from ..models.models import DocumentChunk,RetrievedChunk
+from ..models.models import DocumentChunk, RetrievedChunk
+from ..logger.logger import GLOBAL_LOGGER as logger
 
 settings = get_settings()
 
-class EmbeddingProvider:
+class VectorStore:
     """
-    Wraps a sentence-transformers model with bathing and caching.
+    Async Qdrant wrapper.
+
+    All heavy Qdrant calls (upsert, search) are dispatched to a thread-pool
+    executor because qdrant-client's sync API blocks the calling thread.
+    This keeps the asyncio event loop free for other coroutines.
+
+    Collection schema
+    -----------------
+    Each Qdrant point maps 1:1 to a DocumentChunk:
+      id      -> chunk.id (UUID)
+      vector  -> normalised float32 embedding
+      payload -> all DocumentChunk fields (stored as JSON, filterable)
     """
 
-    def __init__(self):
-        self._model = None
-        self._lock = asyncio.Lock()
-        self._cache: dict[str, list[float]]= {}
+    def __init__(self, dim: int= settings.embedding_dim) -> None:
+        self.dim     = dim
+        self._client = None     # initialised in connect()
 
-    async def _load(self):
-        if self._model is not None:
-            return
-        async with self._lock:
-            if self._model is not None:
-                return
-            
-            try:
-                from sentence_transformers import SentenceTransformer
-                loop = asyncio.get_event_loop()
-                self._model = await loop.run_in_executor(
-                    None, SentenceTransformer, settings.embedding_model
+    async def connect(self) -> None:
+        """
+        Connect to Qdrant and create the collection if it does not exist.
+        Call once at application startup (inside FastAPI lifespan).
+
+        Server mode: settings.qdrant_url is set -> connects to that Qdrant server.
+        Local mode:  settings.qdrant_url is ""  -> in-process, persisted to cfg.local_path.
+        """
+        from qdrant_client import QdrantClient
+
+        loop = asyncio.get_event_loop()
+
+        def _build() -> QdrantClient:
+            if settings.qdrant_url:
+                return QdrantClient(
+                    url=settings.qdrant_url,
+                    api_key=settings.qdrant_api_key or None,
+                    timeout=30,
                 )
-                logger.info("embedding_model_loaded", model=settings.embedding_model)
+            return QdrantClient(path=settings.qdrant_index_path)
 
-            except Exception as e:
-                logger.warning("embedding_model_unavailable", error=str(e),
-                               fallback = "hash_embedding")
-                #raise MulitagentragException("Unable to load embedding model")
-            
-    async def embed(self, texts: list[str]) -> list[list[float]]:
-        await self._load()
-        results = []
-        to_encode: list[tuple[int, str]]=[]
+        self._client = await loop.run_in_executor(None, _build)
+        await loop.run_in_executor(None, self._ensure_collection)
 
-        for i, text in enumerate(texts):
-            key = text[:200]
-            if key in self._cache:
-                results.append((i, self._cache[key]))
+        count = await self.count()
+        logger.info(
+            f"Qdrant ready  collection={settings.collection_name!r}"
+            f"points={count}  dim={self.dim}"
+        )
 
-            else:
-                to_encode.append((i, text))
+    def _ensure_collection(self) -> None:
+        """
+        Create the Qdrant collection with HNSW params from config.
+        Idempotent — skipped if the collection already exists.
+        """
+        from qdrant_client.models import Distance, HnswConfigDiff, VectorParams
 
-        if to_encode and self._model is not None:
-            loop = asyncio.get_event_loop()
-            raw = await loop.run_in_executor(
-                None,
-                lambda: self._model.encode(
-                    [t for _, t in to_encode],
-                    batch_size = settings.embedding_batch_size,
-                    normalize_embeddings = True,
-                    show_progress_bar = False
-                ).tolist(),
+        existing = [c.name for c in self._client.get_collections().collections]
+        if settings.collection_name in existing:
+            return
+
+        self._client.create_collection(
+            collection_name=settings.collection_name,
+            vectors_config=VectorParams(
+                size=self.dim,
+                # we use COSINE because the vectors are L2-normalised with sentence-transformers
+                distance=Distance.COSINE,
+                hnsw_config=HnswConfigDiff(
+                    m=settings.hnsw_m,
+                    ef_construct=settings.hnsw_ef_construct,
+                    on_disk=False,      # set True to reduce RAM for very large corpora
+                ),
+            ),
+        )
+        logger.info(
+            f"Collection {settings.collection_name} created"
+            f"m={settings.hnsw_m}  ef_construct={settings.hnsw_ef_construct}"
+        )
+
+    # Write to QDrant
+
+    async def add_chunks(self, chunks: list[DocumentChunk], embeddings) -> None:
+        """
+        Upsert a batch of chunks into Qdrant.
+        Upsert is idempotent on chunk.id — safe to retry on failure.
+        """
+        if not chunks:
+            logger.info("Chunk is empty!")
+            return
+        
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(None, self._upsert_sync, chunks, embeddings)
+
+    def _upsert_sync(self, chunks: list[DocumentChunk], embeddings) -> None:
+        from qdrant_client.models import PointStruct
+
+        points = []
+        for chunk, emb in zip(chunks, embeddings):
+            # Hoist doc_id to a top-level payload field so Qdrant can filter
+            # on it directly without JSON path nesting.
+            payload = {
+                "id":           chunk.id,
+                "content":      chunk.content,
+                "source":       chunk.source,
+                "chunk_index":  chunk.chunk_index,
+               # "content_type": chunk.content_type.value,
+                #"page_number":  chunk.page_number,
+                "doc_id":       chunk.doc_id,
+                "metadata":     chunk.metadata,
+            }
+            points.append(
+                PointStruct(
+                    id=str(uuid.UUID(chunk.id)),     # Qdrant requires valid UUID
+                    vector=emb.tolist(),
+                    payload=payload,
+                )
             )
 
-            for (i, text), vec in zip(to_encode, raw):
-                self._cache[text[:200]]= vec
-                results.append((i, vec))
+        # wait=True ensures the points are indexed before we return —
+        # important for correctness, not just eventual consistency.
+        self._client.upsert(
+            collection_name=settings.collection_name,
+            points=points,
+            wait=True,
+        )
+        logger.debug(f"Upserted {len(points)} points")
 
-        elif to_encode:
-            for i, text in to_encode:
-                vec = self._hash_embed(text, settings.embedding_dim)
-                results.append((i,vec))
-
-        results.sort(key=lambda x:x[0])
-        return [v for _, v in results]
-    
-    def _hash_embed(self,text:str, dim:int)-> list[float]:
+    # Read from QDrant
+    async def search(
+        self,
+        query_vec:  "np.ndarray",
+        top_k:      int   = 10,
+        threshold:  float = 0.65,
+        ef_search:  int   = 128,
+        filters:    Optional[dict] = None,
+    ) -> list[RetrievedChunk]:
         """
-        Deterministic fallback embedding
+        HNSW approximate nearest-neighbour search.
+
+        ef_search  — query-time beam width:
+                     higher  -> better recall, slower  (128-256 for production)
+                     lower   -> faster, less accurate  (32-64 for latency-sensitive paths)
+
+        filters    — Qdrant payload filter dict, e.g.
+                     {"must": [{"key": "source", "match": {"value": "report.pdf"}}]}
+                     Passed to Qdrant's Filter(**filters) constructor.
         """
+        if self._client is None:
+            logger.info("Qdrant not initialized!")
+            return []
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(
+            None,
+            self._search_sync,
+            query_vec.tolist(),
+            top_k,
+            threshold,
+            ef_search,
+            filters,
+        )
 
-        h = hashlib.sha256(text.encode()).digit()
-        raw = [(b/ 255.0)*2-1 for b in (h*((dim//len(h)) +1))[:dim]]
-        norm = max(float(np.linalg.norm(raw)), 1e-9)
-        return [v/norm for v in raw]
+    def _search_sync(
+        self,
+        query_vec: list,
+        top_k:     int,
+        threshold: float,
+        ef_search: int,
+        filters:   Optional[dict],
+    ) -> list[RetrievedChunk]:
+        from qdrant_client.models import Filter, SearchParams
 
+        qdrant_filter = Filter(**filters) if filters else None
 
-class VectorStoreBase(ABC):
-    @abstractmethod
-    async def add_chunks(self, chunks: list[DocumentChunk])->None: ...
+        hits = self._client.query_points(
+            collection_name=settings.collection_name,
+            query_vector=query_vec,
+            limit=top_k,
+            score_threshold=threshold,
+            query_filter=qdrant_filter,
+            search_params=SearchParams(
+                hnsw_ef=ef_search,
+                exact=False,            # True = brute-force exact search (testing only)
+            ),
+            with_payload=True,
+        )
+        return [self._point_to_chunk(hit) for hit in hits]
 
-    @abstractmethod
-    async def search(self, query_embedding: list[float], top_k:int)-> list[DocumentChunk]: ...
+    @staticmethod
+    def _point_to_chunk(hit) -> RetrievedChunk:
+        """Reconstruct DocumentChunk from a Qdrant ScoredPoint payload."""
+        from src.models.models import ContentType
+        p = hit.payload
+        chunk = DocumentChunk(
+            id=           p["id"],
+            content=      p["content"],
+            source=       p["source"],
+            chunk_index=  p["chunk_index", 0],
+            content_type= ContentType(p.get("content_type", "prose")),
+            page_number=  p.get("page_number"),
+            metadata=     p.get("metadata", {}),
+        )
+        return RetrievedChunk(chunk=chunk, similarity_score=float(hit.score))
 
-    @abstractmethod
-    async def delete_document(self, doc_id: str)-> int: ...
+    #Delete from QDrant
 
-    @abstractmethod
-    async def count(self)-> int: ...
-
-class FAISSVectorStore(VectorStoreBase):
-    """
-    In-pocess FAISS index with an append_only JSON Wal for persistence.
-    """
-    def __init__(self):
-        self._index = None
-        self._chunks: list[DocumentChunk]=[]
-        self._id_to_pos: dict[str, int]= {}
-        self._lock = asyncio.Lock()
-        self._wal_path = settings.faiss_index_path + ".wal"
-        os.makedirs(os.path.dirname(settings.faiss_index_path) or ".", exist_ok=True)
-
-    async def initialize(self)-> None:
-        """
-        Load or create FAISS index, replay WAL.
-        """
-        async with self._lock:
-            try:
-                import faiss
-                dim = settings.embedding_dim
-                if os.path.exists(settings.faiss_index_path):
-                    loop =asyncio.get_event_loop()
-                    self._index = await loop.run_in_executor(
-                        None, faiss.read_index, settings.faiss_index_path
-                    )
-
-                    with open(settings.faiss_index_path + ".meta", 'rb') as f:
-                        self._chunks = pickle.load(f)
-
-                    self._id_to_pos = {c.id: i for i, c in enumerate(self._chunks)}
-                    logger.info("faiss_index_loaded", vectors = len(self._chunks))
-
-                else:
-                    self._index = faiss.IndexFlatIP(dim)
-                    logger.info("faiss_index_created", dim=dim)
-
-            except ImportError:
-                logger.warning('Faiss_unavailable', fallback = "numpy_brute_force")
-                self._index = None
-
-    async def add_chunks(self, chunks: list[DocumentChunk])-> None:
-        if not chunks:
-            return
-        
-        async with self._lock:
-            embeddings = np.array([c.embedding for c in chunks], dtype=np.float32)
-            if self._index is not None:
-                self._index.add(embeddings)
-
-            for chunk in chunks:
-                self._id_to_pos[chunk.id]= len(self._chunks)
-                self._chunks.append(chunk)
-
-            await self._persist()
-        logger.info("chunks_added", count=len(chunks))
-
-    async def search(self, query_embedding: list[float], top_k:int)-> list[RetrievedChunk]:
-        async with self._lock:
-            if not self._chunks:
-                return []
-            
-            q = np.array([query_embedding], dtype=np.float32)
-            if self._index is not None:
-                k = min(top_k * 2, len(self._chunks))
-                scores, indices = self._index.search(q,k)
-                hits = [(float(scores[0][i]), self._chunks[int(indices[0][i])])
-                        for i in range(k) if indices[0][i]>=0]
-                
-            else:
-                matrix = np.array([c.embedding for c in self._chunks], dtype=np.float32)
-                sims = (matrix @ q.T).flatten()
-                top_idx = np.argsort(sims)[::-1][: top_k * 2]
-                hits = [(float(sims[i]), self._chunks[i]) for i in top_idx]
-
-            hits.sort(key=lambda x: x[0], reverse=True)
-            return [
-                RetrievedChunk(chunk=chunk, vector_score =max(0.0, min(1.0, score)))
-                for score, chunk in hits[:top_k]
-            ]
-        
     async def delete_document(self, doc_id: str) -> int:
-        async with self._lock:
-            before = len(self._chunks)
-            self._chunks = [c for c in self._chunks if c.doc_id != doc_id]
-            removed = before - len(self._chunks)
-            if removed:
-                await self._rebuild_index()
-            return removed
-        
+        """
+        Delete all points belonging to doc_id using a payload filter.
+        No index rebuild — Qdrant handles this natively unlike FAISS.
+        Returns number of points deleted.
+        """
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, self._delete_sync, doc_id)
+
+    def _delete_sync(self, doc_id: str) -> int:
+        from qdrant_client.models import FieldCondition, Filter, MatchValue
+
+        filt = Filter(
+            must=[FieldCondition(key="doc_id", match=MatchValue(value=doc_id))]
+        )
+        # Count before so we can report how many were removed
+        before = self._client.count(
+            collection_name=settings.collection_name,
+            count_filter=filt,
+            exact=True,
+        ).count
+
+        if before == 0:
+            return 0
+
+        self._client.delete(
+            collection_name=settings.collection_name,
+            points_selector=filt,
+            wait=True,
+        )
+        logger.info(f"Deleted doc_id={doc_id!r}  removed={before}")
+        return before
+
+    #Utilities to run the Qdrant_client.count() function as a async function
+
     async def count(self) -> int:
-        return len(self._chunks)
+        if self._client is None:
+            return 0
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(
+            None,
+            lambda: self._client.count(
+                collection_name=settings.collection_name, exact=False
+            ),
+        )
+        return result.count
+
+    async def collection_info(self) -> dict:
+        """Metadata dict for the /health endpoint."""
+        if self._client is None:
+            return {"status": "disconnected"}
+        loop = asyncio.get_event_loop()
+        info = await loop.run_in_executor(
+            None,
+            lambda: self._client.get_collection(settings.collection_name),
+        )
+        return {
+            "name":              settings.collection_name,
+            "vectors_count":     info.vectors_count,
+            "points_count":      info.points_count,
+            "status":            str(info.status),
+            "hnsw_m":            settings.hnsw_m,
+            "hnsw_ef_construct": settings.hnsw_ef_construct,
+        }
     
-    async def _persist(self) -> None:
-        if self._index is None:
-            return 
-        
-        try: 
-            import faiss
-            loop = asyncio.get_event_loop()
-            await loop.run_in_executor(None, faiss.write_index, self._index, settings.faiss_index_path)
-            with open(settings.faiss_index_path + ".meta", 'wb') as f:
-                pickle.dump(self._chunks, f)
+_store: Optional[VectorStore]=None
 
-        except Exception as e:
-            logger.error("faiss_persist_failed", error=str(e))
-            raise MulitagentragException("FAISS persist failed")
-        
-    async def _rebuild_index(self)-> None:
-        try:
-            import faiss
-            dim = settings.embedding_dim
-            self._index = faiss.IndexFlatIP(dim)
-            if self._chunks:
-                emb=np.array([c.embedding for c in self._chunks], dtype=np.float32)
-                self._index.add(emb)
-            self._id_to_pos = {c.id:i for i, c in enumerate(self._chunks)}
-            await self._persist()
-
-        except Exception as e:
-            logger.error("faiss_rebuild_failed", error= str(e))
-            raise MulitagentragException("Failed to Rebuild FAISS", e)
-            
-_store: Optional[FAISSVectorStore]=None
-_embedder: Optional[EmbeddingProvider]= None
-
-async def get_vector_store()-> FAISSVectorStore:
+async def get_vector_store()-> VectorStore:
     global _store
     if _store is None:
-        _store = FAISSVectorStore()
-        await _store.initialize()
+        _store = VectorStore()
+        await _store.connect()
 
     return _store
-
-async def get_embedder()-> EmbeddingProvider:
-    global _embedder
-    if _embedder is None:
-        _embedder = EmbeddingProvider()
-        await _embedder._load()
-
-    return _embedder
-
