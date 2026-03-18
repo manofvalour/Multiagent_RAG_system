@@ -1,5 +1,5 @@
 """
-src/agents/query_expansion.py
+/agents/query_expansion.py
 Rewrites the user query into variants that maximise retrieval recall.
 
 HyDE        — generate a hypothetical answer, embed it instead of the question
