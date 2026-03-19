@@ -112,48 +112,6 @@ class ChunkRetrieval:
         logger.info(f"[Retriever] queries={len(queries)}  unique_chunks={len(merged)}")
         return merged, event
 
-
-class RetrievalValidationAgent:
-    """
-    Combines vector similarity with keyword overlap for a more defined relevance score.
-    Drops chunks below threshold to prevent context poisoning
-    """
-
-    NAME = "RetrievalValidation"
-
-    def __init__(self, threshold:float = settings.retrieval_relevance_threshold):
-        self.threshold= threshold
-
-    async def run(self, query:str, 
-                  chunks: list[RetrievedChunk])-> tuple[list[RetrievedChunk], AgentEvent]:
-        try:
-
-            t0 = time.perf_counter()
-
-            if not chunks:
-                logger.info("Chunk is empty!")
-                return [], _timed_event(agent=self.NAME, status=AgentStatus.DONE, message="No chunks to Validate", start=t0)
-            
-            
-            for rc in chunks:
-                overlap = _overlap_ratio(query, rc.chunk.content)
-                rc.relevance_score= round(0.55 * rc.vector_score + 0.45*overlap,4)
-
-            validated = [rc for rc in chunks if rc.relevance_score >=self.threshold]
-            validated.sort(key=lambda x:x.relevance_score, reverse=True) ## soritng the validated chunk
-
-            dropped = len(chunks) - len(validated)
-            event = _timed_event(agent=self.NAME, status=AgentStatus.DONE,
-                                message=f"Validated {len(validated)}/{len(chunks)} chunks (dropped: {dropped})",
-                                start=t0, kept=len(validated), dropped=dropped,
-                                threshold=self.threshold)
-            
-            logger.info("retrieved_validation", **event.metadata)
-            return validated,event
-
-        except Exception as e:
-            logger.error(f"Retrieval Validaton failed", error= str(e))
-            raise MulitagentragException("Retrieval Validation failed", error_details= str(e))
         
 class RerankerAgent:
 
@@ -493,10 +451,6 @@ class MultiAgentRAGPipeline:
         #Chunk Retrieval
         retrieved_chunk, ev = await self.retrieval.run(expand_query)
         trace.append(ev)
-
-       # # Retrieval validation
-       # validated,ev = await self.validator.run(request, retrieved_chunk)
-       # trace.append(ev)
 
         ## Reranking with an LLM
         reranked, ev = await self.reranker.run(request.query, retrieved_chunk)
