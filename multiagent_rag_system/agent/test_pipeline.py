@@ -257,13 +257,13 @@ async def test_pipeline_trace_disabled():
     #    assert len(chunk.split()) <= 20
 
 def test_ingestion_chunk_id_deterministic():
-    from ..agent.ingestion import DocumentIngestionPipeline
+    from .chunk_retrieval import DocumentIngestionPipeline
     id1 = DocumentIngestionPipeline._chunk_id("doc1", 0, "same content")
     id2 = DocumentIngestionPipeline._chunk_id("doc1", 0, "same content")
     assert id1 == id2
 
 def test_ingestion_chunk_id_unique():
-    from ..agent.ingestion import DocumentIngestionPipeline
+    from .chunk_retrieval import DocumentIngestionPipeline
     id1 = DocumentIngestionPipeline._chunk_id("doc1", 0, "content a")
     id2 = DocumentIngestionPipeline._chunk_id("doc1", 1, "content b")
     assert id1 != id2

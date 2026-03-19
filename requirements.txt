@@ -29,4 +29,9 @@ llama_index
 langgraph
 langchain
 langchain_text_splitters
-qdrant-client
+qdrant_client
+fitz
+easyocr
+python-docx
+python-pptx
+pytesseract

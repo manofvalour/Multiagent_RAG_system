@@ -19,9 +19,15 @@ database:
   db_pool_timeout: 30
 
 reranker:
-  enabled: true
+  enabled: True
   top_n: 5                      # chunks kept after reranking
   model: "BAAI/bge-reranker-v2-m3"
+
+chunker:
+    chunking_strategy: "hybrid"        # hybrid | recursive | sentence
+    chunk_size: 512
+    chunk_overlap: 64
+    use_tokens: False
 
 redis:
   redis_url: 'redis://localhost:6379/0'
@@ -61,11 +67,16 @@ embedding:
   embedding_dim: 384
   embedding_batch_size: 64
 
+
 vector_store:
-  vector_store_type: 'faiss'
-  faiss_index_path: "./data/faiss.index"
+  vector_store_type: 'qdrant'
+  qdrant_index_path: "./data/qdrant"
   top_k_retrieval: 10
-  top_k_after_rerank: 5
+  qdrant_url: "http://localhost:6333"
+  collection_name: "rag_chunk"
+  hnsw_m: 16                  
+  hnsw_ef_construct: 128        
+  hnsw_ef: 128            
 
 
 agents_info:

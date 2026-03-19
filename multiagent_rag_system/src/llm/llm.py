@@ -9,7 +9,7 @@ import httpx
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
 from ..utils.config_loader import get_settings
-from ..logger import GLOBAL_LOGGER as logger
+from ..logger.logger import GLOBAL_LOGGER as logger
 from ..exception.custom_exception import MulitagentragException
 
 settings = get_settings()
@@ -38,26 +38,31 @@ class LLMLoader(BaseLLMClient):
     """
     Loading the LLM needed for the project
     """
-    def __init__(self, llm_model:str):
-        self.llm_config = settings.llm_providers[llm_model]
+    def __init__(self):
+        self.llm_config = settings.llm_providers[settings.active_provider]
         self.base_url = self.llm_config.base_url
 
-        if llm_model =='anthropic':
+        if settings.active_llm =='anthropic':
             self._headers = {
                 "x-api-key": settings.anthropic_api_key.get_secret_value(),
                 "anthropic-version": "2023-06-01",
                 "content-type": "application/json",
             }
 
-        elif llm_model =='groq':
+        elif settings.active_llm =='groq':
             self._headers= {
-                "Authorization":f"Bearer {settings.openai_api_key.get_secret_value() 
-                                          if llm_model == "openai" 
-                                          else settings.groq_api_key.get_secret_value}",
+                "Authorization":f"Bearer {settings.groq_api_key.get_secret_value}",
                 "Content-Type": 'application/json'
             }
 
-        self._client = httpx.AsyncClient(timeout=self.llm_config.timeout_seconds)
+        self.model: httpx.AsyncClient  = None
+
+    def _client(self):
+        if not self._client:
+            return self.model
+        self.model = httpx.AsyncClient(timeout=self.llm_config.timeout_seconds)
+        return self.model
+
 
     @retry(
         stop= stop_after_attempt(3),

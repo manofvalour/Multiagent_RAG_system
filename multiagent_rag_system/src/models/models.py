@@ -21,6 +21,10 @@ class ContentType(str, Enum):
     PROSE    = "prose"
     MARKDOWN = "markdown"
     CODE     = "code"
+    PDF      = "pdf"
+    DOCX     = "docx"
+    IMAGE    = "image"
+    PPTX     = "pptx"
 
 class IngestRequest(BaseModel):
     content:str = Field(..., min_length =10, description ="Raw document text")
@@ -33,24 +37,34 @@ class IngestResponse(BaseModel):
     document_id: str
     chunks_created: int
     processing_ms: float
+    source: str
+    content_type: str
+
 
 ##Document/chunk domain
 class DocumentChunk(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
-
-    id: str = Field(default_factory=lambda:str(uuid.uuid4()))
+    id:str = Field(default_factory=lambda:str(uuid.uuid4()))
     doc_id:str
     content: str
     source: str
     metadata: dict[str, Any] = Field(default_factory=dict)
     chunk_index: int=0
     embedding: Optional[list[float]]=None
+    page_number: Optional[int]= None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class RetrievedChunk(BaseModel):
     chunk: DocumentChunk
     vector_score: float=Field(ge=0.0, le=1.0)
     relevance_score: float = Field(ge=0.0, le=1.0, default=0.0)
+
+class RerankedChunk(BaseModel):
+    chunk: DocumentChunk
+    similarity_score: float=Field(ge=0.0, le=1.0)
+    reranker_score: float = Field(ge=0.0, le=1.0, default=0.0)
+
+
 
 ## setting up again trace
 class AgentEvent(BaseModel):
@@ -71,11 +85,16 @@ class Claim(BaseModel):
 
 ## query pipeline
 class QueryRequest(BaseModel):
+    id: str = Field(default_factory= lambda: str(uuid.uuid4()))
     query: str = Field(..., min_length=3, max_length=2000)
-    top_k: int = Field(default=5, ge=1, le=20)
+    filters: dict = Field(default_factory=dict)
+    stream: bool = False
     min_confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     include_trace: bool = True
     session_id: Optional[str]=None
+
+class QueryExpander(BaseModel):
+    pass
 
 class ConfidenceBreakdown(BaseModel):
     claim_support: float
@@ -89,12 +108,20 @@ class QueryResponse(BaseModel):
     answer:str
     claims: list[Claim]
     retrieved_chunks: list[RetrievedChunk]
+    reranked_chunks: list[RerankedChunk]
+    expanded_queries: list[str]
     confidence: ConfidenceBreakdown
     hallucination_risk: HallucinationRisk
     latency_ms: float
     agent_trace: list[AgentEvent] = Field(default_factory=list)
     cached: bool = False
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class QueryExpansion(BaseModel):
+    enabled: bool = True
+    strategy: str = "hyde"          # hyde | multi_query | both
+    num_queries: int = 3
+    hyde_temperature: float = 0.7
 
 ## checking the health
 class HealthComponent(BaseModel):
@@ -119,6 +146,13 @@ class QueryMetrics(BaseModel):
     cache_hit_rate: float
     top_sources: list[dict[str, Any]]
 
+## RAGAS
+class RAGASScores(BaseModel):
+    faithfulness: Optional[float]= None
+    answer_relevancy: Optional[float] = None
+    context_precision: Optional[float] = None
+    context_recall: Optional[float] = None
+
 ## Authentication
 class TokenRequest(BaseModel):
     username:str
@@ -139,3 +173,5 @@ class APIKeyResponse(BaseModel):
     key: str
     created_at:datetime
     expires_at: Optional[datetime]=None
+
+

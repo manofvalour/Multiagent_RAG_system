@@ -34,7 +34,9 @@ services:
     volumes: [pg_data:/var/lib/postgresql/data]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U rag"]
-      interval: 5s; timeout: 5s; retries: 5
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   redis:
     image: redis:7-alpine
@@ -42,7 +44,9 @@ services:
     volumes: [redis_data:/data]
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 5s; timeout: 5s; retries: 5
+      interval: 5s 
+      timeout: 5s 
+      retries: 5
 
   prometheus:
     image: prom/prometheus:latest

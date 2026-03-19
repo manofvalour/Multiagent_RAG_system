@@ -3,7 +3,7 @@ import os
 from enum import Enum
 from functools import lru_cache
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 import yaml
 from pydantic import BaseModel, Field, SecretStr
@@ -36,6 +36,9 @@ def _load_yaml()-> dict[str, Any]:
                     flat['active_provider']= values.get('active_provider', 'groq')
                     flat['llm_providers']= values.get('providers', {})
                 
+                #elif section =="reranker":
+                 #   flat['reranker']= values.get("reranker", {})
+
                 else:
                     flat.update(values)
             else:
@@ -60,10 +63,21 @@ class LLMProvider(str, Enum):
 class SystemPrompt(str, Enum):
     SYSTEMPROMPT= ""
 
-class VectorStoreType(str, Enum):
-    FAISS = 'faiss'
-    PGVECTOR = 'pgvector'
-    QDRANT = 'qdrant'
+class ExpansionStrategy(Optional[str], Enum):
+    HYDE = 'hyde'
+    MULTI_QUERY = "multi_query"
+    BOTH = 'both'
+
+#class VectorStoreType(str, Enum):
+   # FAISS = 'faiss'
+  #  PGVECTOR = 'pgvector'
+ #   QDRANT = 'qdrant'
+
+class RerankerConfig(BaseModel):
+    """config for the reranker model"""
+    enabled: bool = True
+    top_n: int = 5
+    model: str = "BAAI/bge-reranker-v2-m3"
 
 class LLMProviderConfig(BaseModel):
     """ Config for a single LLM Provider."""
@@ -100,12 +114,6 @@ class Settings(BaseSettings):
     workers: int =4
     cors_origins: list[str] = ["https://localhost:3000", "http://localhost:5173"]
 
-    ## Database
-    database_url: str = "postgresql+asyncpg://rag:rag@localhost:5432/ragdb"
-    db_pool_size: int =10
-    db_max_overflow: int =20
-    db_pool_timeout: int =30
-
     ## Redis
     redis_url: str = "redis://localhost:6379/0"
     cache_ttl_seconds: int = 3600
@@ -129,16 +137,38 @@ class Settings(BaseSettings):
     anthropic_api_key: SecretStr = Field(default="", alias= "ANTHROPIC_API_KEY")
     groq_api_key: SecretStr = Field(default = "", alias = "GROQ_API_KEY")
 
+    ## reranker
+    reranker: dict[str, RerankerConfig]= {
+        "reranker": RerankerConfig(model='')
+    }
+
     ## Embeddings
     embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
     embedding_dim: int = 384
     embedding_batch_size: int =64
 
-    ## vector store
-    vector_store_type: VectorStoreType = VectorStoreType.FAISS
-    faiss_index_path: str ="./data/faise.index"
+    ##Chunking strategy
+    chunking_strategy: str = "hybrid"        # hybrid | recursive | sentence
+    chunk_size: int = 512
+    chunk_overlap: int = 64
+    use_tokens: bool = False
+
+    ## Query Expansion
+    enable_expansion:bool = True
+    expansion_strategy: ExpansionStrategy
+    hyde_temperature: str = 0.7
+    num_queries:int = 3
+
+
+    ## vector store (qdrant)
     top_k_retrieval: int=10
-    top_k_after_rerank: int =5
+    qdrant_api_key: SecretStr = Field(default="", alias = "QDRANT_API_KEY")
+    qdrant_url:str = "http://localhost:6333"
+    collection_name: str = "rag_chunk"
+    hnsw_m: int = 16
+    hnsw_ef_construct: int = 100        
+    hnsw_ef: int  = 128
+    qdrant_index_path: str  = "./data/qdrant"    
 
     ## Agents
     consensus_n_agents: int =5

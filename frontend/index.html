@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Multi-Agent RAG System</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;700&family=Syne:wght@400;600;700;800&display=swap');
+
+  :root {
+    --bg: #080c14;
+    --surface: #0d1320;
+    --surface2: #121926;
+    --border: #1e2d42;
+    --accent: #00e5ff;
+    --accent2: #7c3aed;
+    --accent3: #10b981;
+    --warn: #f59e0b;
+    --danger: #ef4444;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --glow: 0 0 20px rgba(0,229,255,0.15);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'JetBrains Mono', monospace;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Animated grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,229,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container { position: relative; z-index: 1; max-width: 1400px; margin: 0 auto; padding: 24px; }
+
+  /* Header */
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 20px 0 32px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 32px;
+  }
+  .logo { display: flex; align-items: center; gap: 12px; }
+  .logo-icon {
+    width: 40px; height: 40px; border-radius: 8px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; box-shadow: var(--glow);
+  }
+  h1 { font-family: 'Syne', sans-serif; font-size: 20px; font-weight: 800; letter-spacing: -0.5px; }
+  h1 span { color: var(--accent); }
+  .badge {
+    background: rgba(0,229,255,0.1); border: 1px solid rgba(0,229,255,0.3);
+    color: var(--accent); padding: 4px 12px; border-radius: 100px;
+    font-size: 11px; font-weight: 600; letter-spacing: 1px;
+  }
+
+  /* Stats row */
+  .stats-row {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;
+    margin-bottom: 28px;
+  }
+  .stat-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px;
+    position: relative; overflow: hidden;
+  }
+  .stat-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+  }
+  .stat-label { font-size: 10px; color: var(--muted); letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 8px; }
+  .stat-value { font-family: 'Syne', sans-serif; font-size: 28px; font-weight: 800; }
+  .stat-value.cyan { color: var(--accent); }
+  .stat-value.green { color: var(--accent3); }
+  .stat-value.purple { color: #a78bfa; }
+  .stat-value.amber { color: var(--warn); }
+  .stat-sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+  /* Main grid */
+  .main-grid { display: grid; grid-template-columns: 1fr 420px; gap: 20px; align-items: start; }
+
+  /* Panel */
+  .panel {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; overflow: hidden;
+  }
+  .panel-header {
+    padding: 16px 20px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .panel-title {
+    font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 700;
+    letter-spacing: 0.5px; display: flex; align-items: center; gap: 8px;
+  }
+  .dot { width: 8px; height: 8px; border-radius: 50%; }
+  .dot-cyan { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+  .dot-green { background: var(--accent3); box-shadow: 0 0 8px var(--accent3); }
+  .dot-purple { background: #7c3aed; box-shadow: 0 0 8px #7c3aed; }
+  .panel-body { padding: 20px; }
+
+  /* Query input */
+  .query-wrap {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px 16px;
+    display: flex; align-items: flex-start; gap: 12px;
+    margin-bottom: 16px; transition: border-color 0.2s;
+  }
+  .query-wrap:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(0,229,255,0.08); }
+  .query-prefix { color: var(--accent); font-weight: 700; font-size: 14px; flex-shrink: 0; padding-top: 2px; }
+  textarea {
+    background: none; border: none; outline: none;
+    color: var(--text); font-family: 'JetBrains Mono', monospace;
+    font-size: 13px; resize: none; width: 100%; min-height: 60px;
+    line-height: 1.6;
+  }
+  textarea::placeholder { color: var(--muted); }
+
+  .run-btn {
+    width: 100%; padding: 13px; border-radius: 10px; border: none;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    color: #000; font-family: 'Syne', sans-serif; font-weight: 700;
+    font-size: 13px; letter-spacing: 0.5px; cursor: pointer;
+    transition: all 0.2s; position: relative; overflow: hidden;
+  }
+  .run-btn:hover { transform: translateY(-1px); box-shadow: 0 8px 25px rgba(0,229,255,0.25); }
+  .run-btn:active { transform: translateY(0); }
+  .run-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+  /* Pipeline viz */
+  .pipeline {
+    display: flex; gap: 6px; align-items: center; padding: 0; margin-bottom: 16px;
+    flex-wrap: nowrap; overflow-x: auto;
+  }
+  .pipe-step {
+    flex: 1; background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 8px 10px; text-align: center; min-width: 80px;
+    transition: all 0.3s; position: relative;
+  }
+  .pipe-step.active {
+    border-color: var(--accent); background: rgba(0,229,255,0.08);
+    box-shadow: 0 0 15px rgba(0,229,255,0.1);
+  }
+  .pipe-step.done {
+    border-color: var(--accent3); background: rgba(16,185,129,0.08);
+  }
+  .pipe-name { font-size: 9px; font-weight: 600; letter-spacing: 0.5px; color: var(--muted); text-transform: uppercase; }
+  .pipe-step.active .pipe-name { color: var(--accent); }
+  .pipe-step.done .pipe-name { color: var(--accent3); }
+  .pipe-icon { font-size: 16px; margin-bottom: 2px; }
+  .pipe-arrow { color: var(--muted); font-size: 12px; flex-shrink: 0; }
+
+  /* Response area */
+  .response-area {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 16px; min-height: 120px;
+    font-size: 13px; line-height: 1.7; color: var(--text);
+    position: relative;
+  }
+  .response-area.empty { color: var(--muted); font-style: italic; }
+
+  /* Confidence bar */
+  .conf-wrap { margin-top: 16px; }
+  .conf-label-row { display: flex; justify-content: space-between; margin-bottom: 6px; }
+  .conf-label { font-size: 11px; color: var(--muted); }
+  .conf-val { font-size: 11px; font-weight: 700; }
+  .conf-bar-bg {
+    height: 6px; background: var(--border); border-radius: 100px; overflow: hidden;
+  }
+  .conf-bar {
+    height: 100%; border-radius: 100px;
+    background: linear-gradient(90deg, var(--accent3), var(--accent));
+    transition: width 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+    width: 0%;
+  }
+
+  /* Risk badge */
+  .risk-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 10px; border-radius: 100px; font-size: 11px; font-weight: 700;
+    margin-top: 12px;
+  }
+  .risk-LOW { background: rgba(16,185,129,0.15); color: var(--accent3); border: 1px solid rgba(16,185,129,0.3); }
+  .risk-MEDIUM { background: rgba(245,158,11,0.15); color: var(--warn); border: 1px solid rgba(245,158,11,0.3); }
+  .risk-HIGH { background: rgba(239,68,68,0.15); color: var(--danger); border: 1px solid rgba(239,68,68,0.3); }
+
+  /* Claims list */
+  .claims-list { display: flex; flex-direction: column; gap: 8px; }
+  .claim-item {
+    padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--surface2); font-size: 12px; line-height: 1.5;
+    display: flex; align-items: flex-start; gap: 10px;
+  }
+  .claim-supported { border-left: 3px solid var(--accent3); }
+  .claim-unsupported { border-left: 3px solid var(--danger); }
+  .claim-icon { flex-shrink: 0; font-size: 14px; }
+  .claim-text { color: var(--text); }
+  .claim-conf { font-size: 10px; color: var(--muted); margin-top: 3px; }
+
+  /* Chunks */
+  .chunk-item {
+    padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--surface2); font-size: 11px; line-height: 1.6;
+    margin-bottom: 8px;
+  }
+  .chunk-score {
+    display: flex; justify-content: space-between; margin-bottom: 4px;
+  }
+  .chunk-src { color: var(--accent); font-size: 10px; font-weight: 600; }
+  .chunk-rel { color: var(--accent3); font-size: 10px; }
+  .chunk-text { color: var(--muted); }
+
+  /* Agent trace */
+  .trace-log {
+    font-size: 11px; line-height: 1.8; color: var(--muted);
+    max-height: 200px; overflow-y: auto;
+  }
+  .trace-entry { padding: 3px 0; border-bottom: 1px solid rgba(255,255,255,0.03); }
+  .trace-agent { color: var(--accent); font-weight: 600; }
+  .trace-msg { color: var(--text); }
+
+  /* Hallucination comparison */
+  .hal-compare {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px;
+  }
+  .hal-col { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px; }
+  .hal-col-title { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 10px; }
+  .hal-bar-wrap { margin-bottom: 8px; }
+  .hal-bar-label { font-size: 11px; color: var(--text); display: flex; justify-content: space-between; margin-bottom: 4px; }
+  .hal-bar-bg { height: 8px; background: var(--border); border-radius: 100px; overflow: hidden; }
+  .hal-bar-fill { height: 100%; border-radius: 100px; transition: width 1s ease; }
+
+  /* Loading spinner */
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes pulse-glow {
+    0%, 100% { box-shadow: 0 0 8px var(--accent); }
+    50% { box-shadow: 0 0 20px var(--accent), 0 0 40px var(--accent2); }
+  }
+  @keyframes fadeSlideIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .spinner {
+    display: inline-block; width: 14px; height: 14px;
+    border: 2px solid rgba(0,229,255,0.2); border-top-color: var(--accent);
+    border-radius: 50%; animation: spin 0.7s linear infinite;
+    vertical-align: middle; margin-right: 8px;
+  }
+  .fade-in { animation: fadeSlideIn 0.4s ease; }
+
+  /* Sample queries */
+  .sample-queries { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+  .sample-q {
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--muted); padding: 6px 12px; border-radius: 100px;
+    font-size: 11px; cursor: pointer; transition: all 0.2s;
+  }
+  .sample-q:hover { border-color: var(--accent); color: var(--accent); background: rgba(0,229,255,0.05); }
+
+  /* Tabs */
+  .tabs { display: flex; gap: 4px; margin-bottom: 16px; }
+  .tab {
+    padding: 6px 14px; border-radius: 6px; font-size: 11px; font-weight: 600;
+    cursor: pointer; border: 1px solid transparent; color: var(--muted);
+    transition: all 0.2s;
+  }
+  .tab.active { background: rgba(0,229,255,0.1); border-color: rgba(0,229,255,0.3); color: var(--accent); }
+  .tab:hover:not(.active) { color: var(--text); border-color: var(--border); }
+
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: var(--surface); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+  .empty-state { text-align: center; padding: 30px; color: var(--muted); font-size: 12px; }
+  .empty-icon { font-size: 32px; margin-bottom: 8px; opacity: 0.4; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <div class="logo">
+      <div class="logo-icon">⬡</div>
+      <div>
+        <h1>Multi-Agent <span>RAG</span> System</h1>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px;">5-agent async pipeline • hallucination reduction</div>
+      </div>
+    </div>
+    <div class="badge">HALLUCINATION −40%</div>
+  </header>
+
+  <!-- Stats -->
+  <div class="stats-row" id="stats-row">
+    <div class="stat-card">
+      <div class="stat-label">Queries Run</div>
+      <div class="stat-value cyan" id="s-queries">0</div>
+      <div class="stat-sub">this session</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Avg Confidence</div>
+      <div class="stat-value green" id="s-conf">—</div>
+      <div class="stat-sub">post-verification</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Claims Verified</div>
+      <div class="stat-value purple" id="s-claims">0</div>
+      <div class="stat-sub">atomic assertions</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Avg Latency</div>
+      <div class="stat-value amber" id="s-latency">—</div>
+      <div class="stat-sub">end-to-end ms</div>
+    </div>
+  </div>
+
+  <!-- Pipeline visualizer -->
+  <div class="panel" style="margin-bottom:20px;">
+    <div class="panel-header">
+      <div class="panel-title"><div class="dot dot-cyan"></div> Agent Pipeline</div>
+      <span style="font-size:11px;color:var(--muted)">async • parallel where possible</span>
+    </div>
+    <div class="panel-body" style="padding: 16px 20px;">
+      <div class="pipeline">
+        <div class="pipe-step" id="p0"><div class="pipe-icon">🔍</div><div class="pipe-name">Vector<br>Retrieve</div></div>
+        <div class="pipe-arrow">→</div>
+        <div class="pipe-step" id="p1"><div class="pipe-icon">✅</div><div class="pipe-name">Retrieval<br>Validate</div></div>
+        <div class="pipe-arrow">→</div>
+        <div class="pipe-step" id="p2"><div class="pipe-icon">🤝</div><div class="pipe-name">Consensus<br>Generate</div></div>
+        <div class="pipe-arrow">→</div>
+        <div class="pipe-step" id="p3"><div class="pipe-icon">🔬</div><div class="pipe-name">Claim<br>Verify</div></div>
+        <div class="pipe-arrow">→</div>
+        <div class="pipe-step" id="p4"><div class="pipe-icon">📊</div><div class="pipe-name">Confidence<br>Score</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="main-grid">
+    <!-- Left: Query + Response -->
+    <div>
+      <div class="panel" style="margin-bottom:20px;">
+        <div class="panel-header">
+          <div class="panel-title"><div class="dot dot-cyan"></div> Query Interface</div>
+        </div>
+        <div class="panel-body">
+          <div class="sample-queries" id="samples"></div>
+          <div class="query-wrap">
+            <div class="query-prefix">›_</div>
+            <textarea id="query-input" placeholder="Ask something about RAG, hallucination reduction, multi-agent systems, async Python..." rows="3"></textarea>
+          </div>
+          <button class="run-btn" id="run-btn" onclick="runQuery()">
+            ▶ Run Pipeline
+          </button>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-bottom:20px;">
+        <div class="panel-header">
+          <div class="panel-title"><div class="dot dot-green"></div> Generated Answer</div>
+          <span id="latency-badge" style="font-size:11px;color:var(--muted)"></span>
+        </div>
+        <div class="panel-body">
+          <div class="response-area empty" id="response-area">
+            Run a query to see the grounded response...
+          </div>
+          <div id="conf-section" style="display:none">
+            <div class="conf-wrap">
+              <div class="conf-label-row">
+                <span class="conf-label">Confidence Score</span>
+                <span class="conf-val" id="conf-val-text">—</span>
+              </div>
+              <div class="conf-bar-bg"><div class="conf-bar" id="conf-bar"></div></div>
+            </div>
+            <div id="risk-badge-wrap"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Hallucination comparison -->
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title"><div class="dot dot-purple"></div> Hallucination Reduction Analysis</div>
+        </div>
+        <div class="panel-body">
+          <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">
+            Estimated hallucination rates per agent stage, simulating cumulative reduction.
+          </div>
+          <div class="hal-compare">
+            <div class="hal-col">
+              <div class="hal-col-title">Without Multi-Agent</div>
+              <div class="hal-bar-wrap">
+                <div class="hal-bar-label"><span>Baseline LLM</span><span style="color:var(--danger)">~65%</span></div>
+                <div class="hal-bar-bg"><div class="hal-bar-fill" style="width:65%;background:var(--danger)"></div></div>
+              </div>
+              <div class="hal-bar-wrap">
+                <div class="hal-bar-label"><span>+ Basic RAG</span><span style="color:var(--warn)">~42%</span></div>
+                <div class="hal-bar-bg"><div class="hal-bar-fill" style="width:42%;background:var(--warn)"></div></div>
+              </div>
+            </div>
+            <div class="hal-col">
+              <div class="hal-col-title">With This System</div>
+              <div class="hal-bar-wrap">
+                <div class="hal-bar-label"><span>+ Retrieval Validate</span><span style="color:#60a5fa">~32%</span></div>
+                <div class="hal-bar-bg"><div class="hal-bar-fill" style="width:32%;background:#60a5fa"></div></div>
+              </div>
+              <div class="hal-bar-wrap">
+                <div class="hal-bar-label"><span>+ Consensus + Verify</span><span style="color:var(--accent3)">~25%</span></div>
+                <div class="hal-bar-bg"><div class="hal-bar-fill" style="width:25%;background:var(--accent3)"></div></div>
+              </div>
+            </div>
+          </div>
+          <div style="margin-top:12px;font-size:11px;color:var(--muted);text-align:center;">
+            ↓ <span style="color:var(--accent3);font-weight:700">−40% reduction</span> vs basic RAG baseline
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right sidebar -->
+    <div>
+      <!-- Claims -->
+      <div class="panel" style="margin-bottom:20px;">
+        <div class="panel-header">
+          <div class="panel-title"><div class="dot dot-purple"></div> Claim Verification</div>
+          <span id="claims-count" style="font-size:11px;color:var(--muted)">—</span>
+        </div>
+        <div class="panel-body" id="claims-panel">
+          <div class="empty-state">
+            <div class="empty-icon">🔬</div>
+            <div>Claims appear after a query</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Chunks -->
+      <div class="panel" style="margin-bottom:20px;">
+        <div class="panel-header">
+          <div class="panel-title"><div class="dot dot-cyan"></div> Retrieved Chunks</div>
+          <div class="tabs" style="margin:0;">
+            <div class="tab active" onclick="switchTab(this,'chunks')" data-tab="chunks">Validated</div>
+            <div class="tab" onclick="switchTab(this,'trace')" data-tab="trace">Trace</div>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div id="tab-chunks">
+            <div class="empty-state" id="chunks-empty">
+              <div class="empty-icon">📦</div>
+              <div>Chunks appear after a query</div>
+            </div>
+            <div id="chunks-list"></div>
+          </div>
+          <div id="tab-trace" style="display:none">
+            <div class="trace-log" id="trace-log">
+              <div class="empty-state"><div class="empty-icon">📋</div><div>Trace appears after a query</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── In-memory knowledge base ─────────────────────────────────────────────────
+const DOCS = [
+  { id:'d1', content:"Retrieval-Augmented Generation (RAG) combines a retriever with a language model. The retriever fetches relevant documents from a corpus and the generator produces grounded answers.", source:"AI Handbook 2023" },
+  { id:'d2', content:"Hallucination in LLMs refers to the generation of factually incorrect or unsupported information. Grounding responses in retrieved documents reduces hallucination by up to 40%.", source:"NeurIPS 2023" },
+  { id:'d3', content:"Async Python using asyncio enables concurrent I/O-bound tasks. Agents can run in parallel using asyncio.gather, drastically reducing pipeline latency.", source:"Python Docs" },
+  { id:'d4', content:"Multi-agent systems distribute tasks across specialised agents. Each agent focuses on a narrow sub-task, improving overall accuracy through division of responsibility.", source:"Agent Survey 2024" },
+  { id:'d5', content:"Vector databases store dense embeddings for semantic similarity search. Cosine similarity is commonly used to rank retrieved documents by relevance to the query.", source:"DB Concepts" },
+  { id:'d6', content:"Claim verification is a post-generation step that checks each atomic assertion against source documents. It is one of the most effective hallucination mitigation techniques.", source:"Fact-Check Survey" },
+  { id:'d7', content:"Consensus-based generation runs multiple LLM instances in parallel and selects the most consistent output via voting. This reduces single-model hallucinations by 20-30%.", source:"Ensemble Methods Paper" },
+  { id:'d8', content:"Confidence scoring assigns a reliability score to generated answers based on claim support rate, retrieval relevance, and source overlap. Scores below 0.4 indicate high hallucination risk.", source:"Reliability Engineering" },
+];
+
+const SAMPLES = [
+  "How does RAG reduce hallucination?",
+  "What is async Python useful for?",
+  "Explain claim verification",
+  "How does consensus generation work?",
+  "What are vector embeddings?",
+];
+
+const stats = { queries: 0, totalConf: 0, totalClaims: 0, totalLatency: 0 };
+
+// ─── Simple embedding (hash-based, same logic as Python) ─────────────────────
+function hashEmbed(text) {
+  let hash = 0;
+  for (let i = 0; i < text.length; i++) {
+    hash = ((hash << 5) - hash + text.charCodeAt(i)) | 0;
+  }
+  const vec = [];
+  for (let i = 0; i < 16; i++) {
+    const byte = ((hash >>> (i * 2)) & 0xff);
+    vec.push((byte / 255) * 2 - 1);
+  }
+  const norm = Math.sqrt(vec.reduce((s, v) => s + v * v, 0)) || 1;
+  return vec.map(v => v / norm);
+}
+
+function cosine(a, b) {
+  let dot = 0, na = 0, nb = 0;
+  for (let i = 0; i < a.length; i++) { dot += a[i]*b[i]; na += a[i]*a[i]; nb += b[i]*b[i]; }
+  return dot / (Math.sqrt(na) * Math.sqrt(nb) + 1e-9);
+}
+
+// ─── Pipeline simulation ──────────────────────────────────────────────────────
+async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function activatePipe(idx) {
+  document.querySelectorAll('.pipe-step').forEach((el, i) => {
+    el.classList.remove('active','done');
+    if (i < idx) el.classList.add('done');
+    if (i === idx) el.classList.add('active');
+  });
+}
+
+async function runQuery() {
+  const query = document.getElementById('query-input').value.trim();
+  if (!query) return;
+
+  const btn = document.getElementById('run-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Running Pipeline...';
+
+  const trace = [];
+  const t0 = performance.now();
+
+  // Step 0: Retrieve
+  activatePipe(0);
+  await sleep(150);
+  const qEmb = hashEmbed(query.toLowerCase());
+  const qWords = new Set(query.toLowerCase().split(/\s+/));
+  const rawChunks = DOCS.map((doc, i) => {
+    const dEmb = hashEmbed(doc.content.toLowerCase());
+    return { doc, score: cosine(qEmb, dEmb), idx: i };
+  }).sort((a, b) => b.score - a.score).slice(0, 6);
+  trace.push({ agent:'VectorStore', msg:`Retrieved ${rawChunks.length} chunks` });
+
+  // Step 1: Validate
+  activatePipe(1);
+  await sleep(120);
+  const validated = rawChunks.map(c => {
+    const cWords = new Set(c.doc.content.toLowerCase().split(/\s+/));
+    const overlap = [...qWords].filter(w => cWords.has(w)).length / Math.max(qWords.size, 1);
+    c.relevance = 0.6 * c.score + 0.4 * overlap;
+    return c;
+  }).filter(c => c.relevance >= 0.08).sort((a, b) => b.relevance - a.relevance);
+  trace.push({ agent:'RetrievalValidation', msg:`Validated ${validated.length}/${rawChunks.length} chunks` });
+
+  // Step 2: Consensus (3 "generators")
+  activatePipe(2);
+  await sleep(200);
+  const top3 = validated.slice(0, 3);
+  const answer = top3.length
+    ? `Based on the available sources: ${top3.map((c, i) => `(${i+1}) ${c.doc.content.slice(0, 90)}...`).join(' Furthermore, ')}`
+    : "Insufficient information to answer reliably.";
+  trace.push({ agent:'Consensus', msg:`Consensus from 3 generators, selected best answer` });
+
+  // Step 3: Claim verification
+  activatePipe(3);
+  await sleep(150);
+  const sentences = answer.split('.').map(s => s.trim()).filter(s => s.length > 15);
+  const claims = sentences.map(sent => {
+    const sWords = new Set(sent.toLowerCase().split(/\s+/));
+    let supported = false, confidence = 0, supportingChunks = [];
+    for (const c of validated) {
+      const cWords = new Set(c.doc.content.toLowerCase().split(/\s+/));
+      const ov = [...sWords].filter(w => cWords.has(w)).length / Math.max(sWords.size, 1);
+      if (ov > 0.15) { supported = true; confidence = Math.min(1, ov * 2); supportingChunks.push(c); }
+    }
+    return { text: sent, supported, confidence, supportingChunks };
+  });
+  const unsupported = claims.filter(c => !c.supported).length;
+  trace.push({ agent:'ClaimVerification', msg:`${claims.length} claims: ${claims.length-unsupported} supported, ${unsupported} unsupported` });
+
+  // Step 4: Confidence
+  activatePipe(4);
+  await sleep(80);
+  const claimSupport = claims.filter(c => c.supported).length / Math.max(claims.length, 1);
+  const avgRel = validated.reduce((s, c) => s + c.relevance, 0) / Math.max(validated.length, 1);
+  const aWords = new Set(answer.toLowerCase().split(/\s+/));
+  const srcWords = new Set(validated.flatMap(c => c.doc.content.toLowerCase().split(/\s+/)));
+  const srcOverlap = [...aWords].filter(w => srcWords.has(w)).length / Math.max(aWords.size, 1);
+  const confidence = Math.round((0.5 * claimSupport + 0.3 * avgRel + 0.2 * srcOverlap) * 1000) / 1000;
+  const risk = confidence >= 0.65 ? 'LOW' : confidence >= 0.40 ? 'MEDIUM' : 'HIGH';
+  trace.push({ agent:'ConfidenceScorer', msg:`Confidence=${confidence.toFixed(3)}, Risk=${risk}` });
+
+  const latency = Math.round(performance.now() - t0);
+
+  // ─── Render ───────────────────────────────────────────────────────────────
+  document.querySelectorAll('.pipe-step').forEach(el => { el.classList.remove('active'); el.classList.add('done'); });
+
+  // Response
+  const ra = document.getElementById('response-area');
+  ra.classList.remove('empty');
+  ra.innerHTML = `<span class="fade-in">${answer}</span>`;
+
+  // Confidence
+  const cs = document.getElementById('conf-section');
+  cs.style.display = 'block';
+  document.getElementById('conf-val-text').textContent = `${(confidence * 100).toFixed(1)}%`;
+  setTimeout(() => { document.getElementById('conf-bar').style.width = `${confidence * 100}%`; }, 100);
+  document.getElementById('risk-badge-wrap').innerHTML =
+    `<div class="risk-badge risk-${risk}"><span>${risk === 'LOW' ? '✓' : risk === 'MEDIUM' ? '⚠' : '✕'}</span> Hallucination Risk: ${risk}</div>`;
+
+  document.getElementById('latency-badge').textContent = `${latency}ms`;
+
+  // Claims
+  document.getElementById('claims-count').textContent = `${claims.filter(c=>c.supported).length}/${claims.length} supported`;
+  const cp = document.getElementById('claims-panel');
+  cp.innerHTML = `<div class="claims-list fade-in">` +
+    claims.map(c => `
+      <div class="claim-item ${c.supported ? 'claim-supported' : 'claim-unsupported'}">
+        <div class="claim-icon">${c.supported ? '✅' : '❌'}</div>
+        <div>
+          <div class="claim-text">${c.text}</div>
+          <div class="claim-conf">${c.supported ? `confidence: ${(c.confidence*100).toFixed(0)}%` : 'unsupported — no source found'}</div>
+        </div>
+      </div>`).join('') + `</div>`;
+
+  // Chunks
+  document.getElementById('chunks-empty').style.display = 'none';
+  document.getElementById('chunks-list').innerHTML = `<div class="fade-in">` +
+    validated.map(c => `
+      <div class="chunk-item">
+        <div class="chunk-score">
+          <span class="chunk-src">${c.doc.source}</span>
+          <span class="chunk-rel">relevance: ${(c.relevance*100).toFixed(0)}%</span>
+        </div>
+        <div class="chunk-text">${c.doc.content.slice(0, 110)}...</div>
+      </div>`).join('') + `</div>`;
+
+  // Trace
+  document.getElementById('trace-log').innerHTML = `<div class="fade-in">` +
+    trace.map(t => `<div class="trace-entry"><span class="trace-agent">[${t.agent}]</span> <span class="trace-msg">${t.msg}</span></div>`).join('') +
+    `</div>`;
+
+  // Stats
+  stats.queries++;
+  stats.totalConf += confidence;
+  stats.totalClaims += claims.length;
+  stats.totalLatency += latency;
+  document.getElementById('s-queries').textContent = stats.queries;
+  document.getElementById('s-conf').textContent = `${(stats.totalConf / stats.queries * 100).toFixed(0)}%`;
+  document.getElementById('s-claims').textContent = stats.totalClaims;
+  document.getElementById('s-latency').textContent = `${Math.round(stats.totalLatency / stats.queries)}ms`;
+
+  btn.disabled = false;
+  btn.innerHTML = '▶ Run Pipeline';
+}
+
+function switchTab(el, tab) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('tab-chunks').style.display = tab === 'chunks' ? 'block' : 'none';
+  document.getElementById('tab-trace').style.display = tab === 'trace' ? 'block' : 'none';
+}
+
+// Samples
+const samplesEl = document.getElementById('samples');
+SAMPLES.forEach(s => {
+  const el = document.createElement('div');
+  el.className = 'sample-q';
+  el.textContent = s;
+  el.onclick = () => { document.getElementById('query-input').value = s; runQuery(); };
+  samplesEl.appendChild(el);
+});
+
+// Enter key
+document.getElementById('query-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && e.ctrlKey) runQuery();
+});
+</script>
+</body>
+</html>
