@@ -433,7 +433,6 @@ class MultiAgentRAGPipeline:
     def __init__(self):
         self.query_expander = QueryExpansionAgent()
         self.retrieval = ChunkRetrieval()
-        self.validator = RetrievalValidationAgent()
         self.reranker = RerankerAgent()
         self.consensus = ConsensusAgent()
         self.verifier = ClaimVerificationAgent()
