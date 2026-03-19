@@ -4,6 +4,7 @@ import re
 import time
 from collections import Counter
 from typing import Optional
+import numpy as np
 
 from ..src.utils.config_loader import get_settings
 from ..src.logger.logger import GLOBAL_LOGGER as logger
@@ -11,12 +12,16 @@ from ..src.exception.custom_exception import MulitagentragException
 from ..src.models.models import (
     AgentEvent, AgentStatus, Claim, ConfidenceBreakdown,
     HallucinationRisk, QueryRequest, QueryResponse,
-    RetrievedChunk,
+    RetrievedChunk, RerankedChunk
     )
+from query_expansion import QueryExpansionAgent
 from ..src.llm.llm import BaseLLMClient, LLMResponse, get_llm_client
+from ..src.database.vector_store import get_vector_store
+from ..src.embedding.embedding import get_embedder
 
 """ Things to buid
         - Retrieval Validation Agent (Done)
+        - Reranker Agent (Done)
         - Answer Generator Agent (Done)
         - Consensus Agent (Done)
         - Claim Verification Agent (Done)
@@ -50,6 +55,64 @@ def _timed_event(agent:str, status: AgentStatus,
     )
 
 
+class ChunkRetrieval:
+
+    NAME = "ChunkRetrieval"
+
+    def __init__(self):
+        pass
+
+    async def run(
+        self, queries:  list[str],
+        filters:  Optional[dict] = None,
+    ) -> tuple[list[RetrievedChunk], AgentEvent]:
+        """
+        queries  -- one or more strings (original + HyDE / multi-query variants)
+        filters  -- optional Qdrant payload filter dict, e.g.
+                    {"must": [{"key": "source", "match": {"value": "report.pdf"}}]}
+        """
+        t0 = time.perf_counter()
+
+        loop = asyncio.get_event_loop()
+
+        # Embed all query variants in a single batch
+        embeddings: np.ndarray = await loop.run_in_executor(
+            None,
+            lambda: get_embedder.embed(
+                queries
+            ).astype(np.float32),
+        )
+
+        # Search concurrently -- one coroutine per query variant
+        tasks = [
+            get_vector_store.search(
+                query_vec=emb,
+                top_k=settings.top_k_retrieval,
+                threshold=settings.retrieval_relevance_threshold,
+                ef_search=settings.hnsw_ef,
+                filters=filters,
+            )
+            for emb in embeddings
+        ]
+        results_per_query: list[list[RetrievedChunk]] = await asyncio.gather(*tasks)
+
+        # Merge: deduplicate by chunk id, keep the highest similarity score
+        best: dict[str, RetrievedChunk] = {}
+        for results in results_per_query:
+            for r in results:
+                cid = r.chunk.id
+                if cid not in best or r.vector_score > best[cid].vector_score:
+                    best[cid] = r
+
+        merged = sorted(best.values(), key=lambda x: x.vector_score, reverse=True)
+        event = _timed_event(agent=self.NAME, status=AgentStatus.DONE,
+                                message=f"{len(queries)} Retrieved Chunks {len(merged)})",
+                                start=t0, kept=len(merged))
+            
+        logger.info(f"[Retriever] queries={len(queries)}  unique_chunks={len(merged)}")
+        return merged, event
+
+
 class RetrievalValidationAgent:
     """
     Combines vector similarity with keyword overlap for a more defined relevance score.
@@ -61,7 +124,8 @@ class RetrievalValidationAgent:
     def __init__(self, threshold:float = settings.retrieval_relevance_threshold):
         self.threshold= threshold
 
-    async def run(self, query:str, chunks: list[RetrievedChunk])-> tuple[list[RetrievedChunk], AgentEvent]:
+    async def run(self, query:str, 
+                  chunks: list[RetrievedChunk])-> tuple[list[RetrievedChunk], AgentEvent]:
         try:
 
             t0 = time.perf_counter()
@@ -90,6 +154,70 @@ class RetrievalValidationAgent:
         except Exception as e:
             logger.error(f"Retrieval Validaton failed", error= str(e))
             raise MulitagentragException("Retrieval Validation failed", error_details= str(e))
+        
+class RerankerAgent:
+
+    NAME = "RerankerAgent"
+
+    def __init__(self) -> None:
+        self._model = None
+        self.reranker = settings.reranker['reranker']
+ 
+    def _load(self) -> None:
+        if self._model is None:
+            from sentence_transformers import CrossEncoder
+            self._model = CrossEncoder(self.reranker.model)
+            logger.info(f"CrossEncoder loaded: {self.reranker.model}")
+ 
+    async def run(self, query: str, 
+                  chunks: list[RetrievedChunk]) -> tuple[list[RerankedChunk], AgentEvent]:
+        t0 = time.perf_counter()
+
+        if not self.reranker.enabled or not chunks:
+            reranked = [RerankedChunk(
+                    chunk=c.chunk,
+                    similarity_score=c.vector_score,
+                )
+                for c in chunks]
+            
+            event = _timed_event(agent=self.NAME, status=AgentStatus.DONE,
+                            message="No chunk to rerank",
+                            start=t0)
+            
+            return reranked, event
+ 
+        loop = asyncio.get_event_loop()
+ 
+        def _run_cross_encoder():
+            self._load()
+            pairs  = [(query, c.chunk.content) for c in chunks]
+            scores = self._model.predict(pairs).tolist()
+            return scores
+ 
+        rerank_scores = await loop.run_in_executor(None, _run_cross_encoder)
+ 
+        reranked = [
+            RerankedChunk(
+                chunk=c.chunk,
+                similarity_score=c.vector_score,
+                reranker_score=float(s),
+            )
+            for c, s in zip(chunks, rerank_scores)
+        ]
+        reranked.sort(key=lambda x: x.reranker_score, reverse=True)
+        reranked = reranked[: self.reranker.top_n]
+        dropped = len(chunks) - len(reranked)
+ 
+        event = _timed_event(agent=self.NAME, status=AgentStatus.DONE,
+                            message=f"Validated {len(reranked)}/{len(chunks)} chunks (dropped: {dropped})",
+                            start=t0, kept=len(reranked), dropped=dropped,
+                            threshold=self.threshold)
+        logger.info(
+            f"[Reranker] in={len(chunks)}  out={len(reranked)}  "
+            f"top_score={reranked[0].reranker_score:.3f}"
+        )
+
+        return reranked, event
         
 
 class AnswerGeneratorAgent:
@@ -345,51 +473,59 @@ class MultiAgentRAGPipeline:
     Agents 4+5 run concurrently after generation.
     """
     def __init__(self):
+        self.query_expander = QueryExpansionAgent()
+        self.retrieval = ChunkRetrieval()
         self.validator = RetrievalValidationAgent()
+        self.reranker = RerankerAgent()
         self.consensus = ConsensusAgent()
         self.verifier = ClaimVerificationAgent()
         self.scorer = ConfidenceScoringAgent()
 
     async def run(
             self, request: QueryRequest,
-            raw_chunks: list[RetrievedChunk],
     )-> QueryResponse:
         t_total = time.perf_counter()
         trace: list[AgentEvent] = []
 
-        # Retrieval validation
-        validated,ev = await self.validator.run(request.query, raw_chunks)
+        #Query expander
+        expand_query, _ = await self.query_expander(request.query)
+
+        #Chunk Retrieval
+        retrieved_chunk, ev = await self.retrieval.run(expand_query)
         trace.append(ev)
 
-        top_chunks = validated[: settings.top_k_after_rerank]
+       # # Retrieval validation
+       # validated,ev = await self.validator.run(request, retrieved_chunk)
+       # trace.append(ev)
+
+        ## Reranking with an LLM
+        reranked, ev = await self.reranker.run(request.query, retrieved_chunk)
+        trace.append(ev)
 
         # Consensus Generation
-        answer, all_answers, ev = await self.consensus.run(request.query, top_chunks)
+        answer, all_answers, ev = await self.consensus.run(request.query, reranked)
         trace.append(ev)
 
         # Claim verification and confidence scoring (running concurrently)
         (claims, ev_claims), (breakdown, risk, ev_score) = await asyncio.gather(
-            self.verifier.run(answer, top_chunks),
-            self.scorer.run(answer, [], top_chunks),
+            self.verifier.run(answer, reranked),
+            self.scorer.run(answer, [], reranked),
         )
         trace.extend([ev_claims, ev_score])
 
-        breakdown, risk, ev_final = await self.scorer.run(answer, claims, top_chunks)
+        breakdown, risk, ev_final = await self.scorer.run(answer, claims, reranked)
         trace.append(ev_final)
 
         return QueryResponse(
             query=request.query,
             answer=answer,
             claims = claims,
-            retrieved_chunks=top_chunks,
+            retrieved_chunks=reranked,
             confidence = breakdown,
             hallucination_risk = risk,
             latency_ms=round((time.perf_counter()- t_total)*1000, 2),
             agent_trace=trace if request.include_trace else [],
         )
-
-
-
 
 if __name__=="__main__":
     h = MultiAgentRAGPipeline()
