@@ -39,7 +39,8 @@ class VectorStore:
       payload -> all DocumentChunk fields (stored as JSON, filterable)
     """
 
-    def __init__(self, dim: int= settings.embedding_dim) -> None:
+    def __init__(self, dim: int= settings.embeddings.embedding_dim) -> None:
+        self.config= settings.vector_store
         self.dim     = dim
         self._client = None     # initialised in connect()
 
@@ -51,25 +52,28 @@ class VectorStore:
         Server mode: settings.qdrant_url is set -> connects to that Qdrant server.
         Local mode:  settings.qdrant_url is ""  -> in-process, persisted to cfg.local_path.
         """
+        if self._client is not None:
+            return
+
         from qdrant_client import QdrantClient
 
         loop = asyncio.get_event_loop()
 
         def _build() -> QdrantClient:
-            if settings.qdrant_url:
+            if self.config.url:
                 return QdrantClient(
-                    url=settings.qdrant_url,
+                    url=self.config.url,
                     api_key=settings.qdrant_api_key or None,
                     timeout=30,
                 )
-            return QdrantClient(path=settings.qdrant_index_path)
+            return QdrantClient(path=self.config.local_path)
 
         self._client = await loop.run_in_executor(None, _build)
         await loop.run_in_executor(None, self._ensure_collection)
 
         count = await self.count()
         logger.info(
-            f"Qdrant ready  collection={settings.collection_name!r}"
+            f"Qdrant ready  collection={self.config.collection_name!r}"
             f"points={count}  dim={self.dim}"
         )
 
@@ -81,25 +85,25 @@ class VectorStore:
         from qdrant_client.models import Distance, HnswConfigDiff, VectorParams
 
         existing = [c.name for c in self._client.get_collections().collections]
-        if settings.collection_name in existing:
+        if self.config.collection_name in existing:
             return
 
         self._client.create_collection(
-            collection_name=settings.collection_name,
+            collection_name=self.config.collection_name,
             vectors_config=VectorParams(
                 size=self.dim,
                 # we use COSINE because the vectors are L2-normalised with sentence-transformers
                 distance=Distance.COSINE,
                 hnsw_config=HnswConfigDiff(
-                    m=settings.hnsw_m,
-                    ef_construct=settings.hnsw_ef_construct,
+                    m=self.config.hnsw_m,
+                    ef_construct=self.config.hnsw_ef_construct,
                     on_disk=False,      # set True to reduce RAM for very large corpora
                 ),
             ),
         )
         logger.info(
-            f"Collection {settings.collection_name} created"
-            f"m={settings.hnsw_m}  ef_construct={settings.hnsw_ef_construct}"
+            f"Collection {self.config.collection_name} created"
+            f"m={self.config.hnsw_m}  ef_construct={self.config.hnsw_ef_construct}"
         )
 
     # Write to QDrant
@@ -144,7 +148,7 @@ class VectorStore:
         # wait=True ensures the points are indexed before we return —
         # important for correctness, not just eventual consistency.
         self._client.upsert(
-            collection_name=settings.collection_name,
+            collection_name=self.config.collection_name,
             points=points,
             wait=True,
         )
@@ -186,19 +190,17 @@ class VectorStore:
 
     def _search_sync(
         self,
-        query_vec: list,
-        top_k:     int,
-        threshold: float,
-        ef_search: int,
-        filters:   Optional[dict],
+        query_vec: list,top_k: int, threshold: float,
+        ef_search: int, filters:   Optional[dict],
     ) -> list[RetrievedChunk]:
+        
         from qdrant_client.models import Filter, SearchParams
 
         qdrant_filter = Filter(**filters) if filters else None
 
-        hits = self._client.query_points(
-            collection_name=settings.collection_name,
-            query_vector=query_vec,
+        response = self._client.query_points(
+            collection_name=self.config.collection_name,
+            query=query_vec,
             limit=top_k,
             score_threshold=threshold,
             query_filter=qdrant_filter,
@@ -208,23 +210,38 @@ class VectorStore:
             ),
             with_payload=True,
         )
-        return [self._point_to_chunk(hit) for hit in hits]
+
+        points = response.points if hasattr(response, "points") else response
+        return [self._point_to_chunk(hit) for hit in points]
 
     @staticmethod
     def _point_to_chunk(hit) -> RetrievedChunk:
         """Reconstruct DocumentChunk from a Qdrant ScoredPoint payload."""
-        from src.models.models import ContentType
-        p = hit.payload
+        from ..models.models import ContentType
+
+        if isinstance(hit, tuple):
+            # Some qdrant wrappers may return ("points", [...]) when iterated
+            _, points = hit
+            if not points:
+                raise ValueError("no scored points in query result tuple")
+            scored_point = points[0]
+        else:
+            scored_point = hit
+
+        p = scored_point.payload
+
         chunk = DocumentChunk(
             id=           p["id"],
             content=      p["content"],
             source=       p["source"],
-            chunk_index=  p["chunk_index", 0],
+            chunk_index=  p.get("chunk_index", 0),
             content_type= ContentType(p.get("content_type", "prose")),
             page_number=  p.get("page_number"),
+            doc_id=       p.get("doc_id"),
             metadata=     p.get("metadata", {}),
         )
-        return RetrievedChunk(chunk=chunk, similarity_score=float(hit.score))
+      #  logger.info(scored_point.score min(1.0, max(0.0, float(scored_point.score))))
+        return RetrievedChunk(chunk=chunk, vector_score=min(1.0, max(0.0, float(scored_point.score))))
 
     #Delete from QDrant
 
@@ -245,7 +262,7 @@ class VectorStore:
         )
         # Count before so we can report how many were removed
         before = self._client.count(
-            collection_name=settings.collection_name,
+            collection_name=self.config.collection_name,
             count_filter=filt,
             exact=True,
         ).count
@@ -254,7 +271,7 @@ class VectorStore:
             return 0
 
         self._client.delete(
-            collection_name=settings.collection_name,
+            collection_name=self.config.collection_name,
             points_selector=filt,
             wait=True,
         )
@@ -270,7 +287,7 @@ class VectorStore:
         result = await loop.run_in_executor(
             None,
             lambda: self._client.count(
-                collection_name=settings.collection_name, exact=False
+                collection_name=self.config.collection_name, exact=False
             ),
         )
         return result.count
@@ -282,15 +299,15 @@ class VectorStore:
         loop = asyncio.get_event_loop()
         info = await loop.run_in_executor(
             None,
-            lambda: self._client.get_collection(settings.collection_name),
+            lambda: self._client.get_collection(self.config.collection_name),
         )
         return {
-            "name":              settings.collection_name,
-            "vectors_count":     info.vectors_count,
+            "name":              self.config.collection_name,
+            "vectors_count":     getattr(info, "vectors_count", info.points_count),
             "points_count":      info.points_count,
             "status":            str(info.status),
-            "hnsw_m":            settings.hnsw_m,
-            "hnsw_ef_construct": settings.hnsw_ef_construct,
+            "hnsw_m":            self.config.hnsw_m,
+            "hnsw_ef_construct": self.config.hnsw_ef_construct,
         }
     
 _store: Optional[VectorStore]=None

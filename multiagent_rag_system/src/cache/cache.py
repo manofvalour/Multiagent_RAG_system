@@ -38,6 +38,7 @@ class CacheClient:
 
     def __init__(self):
         self._r = None
+        self.config = settings.cache
     
     async def _client(self):
         if self._r is None:
@@ -55,7 +56,7 @@ class CacheClient:
             return None
         
     
-    async def set(self, key:str, value:Any, ttl:int= settings.cache_ttl_seconds)-> None:
+    async def set(self, key:str, value:Any, ttl:int= settings.cache.ttl_seconds)-> None:
         r = await self._client()
         try:
             await r.setex(key, ttl, json.dumps(value, default = str))
@@ -84,15 +85,15 @@ class CacheClient:
         try:
             pipe = r.pipeline()
             await pipe.incr(key)
-            await pipe.expire(key, settings.rate_limit_window_seconds)
+            await pipe.expire(key, self.config.window_seconds)
             results = await pipe.execute()
             count = results[0]
-            remaining = max(0, settings.rate_limit_requests- count)
-            allowed = count <= settings.rate_limit_requests
+            remaining = max(0, self.config.requests_per_minute - count)
+            allowed = count <= self.config.requests_per_minute
             return allowed, remaining
         
         except Exception as e:
-            return True, settings.rate_limit_requests
+            return True, self.config.requests_per_minute
         
     async def lpush_bounded(self, key: str, value: Any, max_len: int=1000)->None:
         """Push to a list and trim to max_len (used for query history)"""
@@ -166,7 +167,7 @@ class _FakePipeline:
         self._ops: list = []
 
     async def incr(self, key: str): self._ops.append(("incr", key)); return self
-    async def expire(self, key, ttl): self._opts.append(("expire", key, ttl)); return self
+    async def expire(self, key, ttl): self._ops.append(("expire", key, ttl)); return self
 
     async def execute(self)-> list:
         results = []

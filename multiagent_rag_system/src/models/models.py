@@ -64,8 +64,6 @@ class RerankedChunk(BaseModel):
     similarity_score: float=Field(ge=0.0, le=1.0)
     reranker_score: float = Field(ge=0.0, le=1.0, default=0.0)
 
-
-
 ## setting up again trace
 class AgentEvent(BaseModel):
     agent: str
@@ -92,9 +90,6 @@ class QueryRequest(BaseModel):
     min_confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     include_trace: bool = True
     session_id: Optional[str]=None
-
-class QueryExpander(BaseModel):
-    pass
 
 class ConfidenceBreakdown(BaseModel):
     claim_support: float

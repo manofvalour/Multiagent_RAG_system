@@ -27,6 +27,7 @@ class EmbeddingProvider:
         self._model = None
         self._lock = asyncio.Lock()
         self._cache: dict[str, list[float]]= {}
+        self.config = settings.embeddings
 
     async def _load(self):
         if self._model is not None:
@@ -39,9 +40,9 @@ class EmbeddingProvider:
                 from sentence_transformers import SentenceTransformer
                 loop = asyncio.get_event_loop()
                 self._model = await loop.run_in_executor(
-                    None, SentenceTransformer, settings.embedding_model
+                    None, SentenceTransformer, self.config.model
                 )
-                logger.info("embedding_model_loaded", model=settings.embedding_model)
+                logger.info("embedding_model_loaded", model=self.config.model)
 
             except Exception as e:
                 logger.warning("embedding_model_unavailable", error=str(e),
@@ -67,7 +68,7 @@ class EmbeddingProvider:
                 None,
                 lambda: self._model.encode(
                     [t for _, t in to_encode],
-                    batch_size = settings.embedding_batch_size,
+                    batch_size = self.config.batch_size,
                     normalize_embeddings = True,
                     show_progress_bar = False
                 ).tolist(),
@@ -79,7 +80,7 @@ class EmbeddingProvider:
 
         elif to_encode:
             for i, text in to_encode:
-                vec = self._hash_embed(text, settings.embedding_dim)
+                vec = self._hash_embed(text, self.config.embedding_dim)
                 results.append((i,vec))
 
         results.sort(key=lambda x:x[0])
@@ -99,9 +100,9 @@ class EmbeddingProvider:
 _embed: Optional[EmbeddingProvider]=None
 
 async def get_embedder()-> EmbeddingProvider:
-    global _store
-    if _store is None:
-        _store = EmbeddingProvider()
+    global _embed
+    if _embed is None:
+        _embed = EmbeddingProvider()
         await _embed._load()
 
-    return _store
+    return _embed

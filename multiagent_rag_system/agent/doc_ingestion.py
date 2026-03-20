@@ -90,6 +90,9 @@ class FileParser:
                     needs_ocr.append(i)
         except ImportError:
             needs_ocr = list(range(20))   # assume all pages need OCR
+        except Exception as e:
+            logger.warning(f"PDF parsing failed: {e}. Returning empty text.")
+            needs_ocr = list(range(20))
 
         if needs_ocr:
             try:
@@ -235,7 +238,8 @@ class HybridChunker:
 
     def __init__(self) -> None:
         self.semantic = SemanticChunker(threshold=0.5)
-        if settings.use_tokens:
+        self.config = settings.chunking
+        if self.config.use_tokens:
             import tiktoken
             enc = tiktoken.encoding_for_model("openai/gpt-oss-120b")
             self._len_fn = lambda t: len(enc.encode(t))
@@ -246,19 +250,19 @@ class HybridChunker:
         if ct == ContentType.CODE:
             return RecursiveCharacterTextSplitter.from_language(
                 language=Language.PYTHON,
-                chunk_size=settings.chunk_size,
-                chunk_overlap=settings.chunk_overlap,
+                chunk_size=self.config.chunk_size,
+                chunk_overlap=self.config.chunk_overlap,
             )
         if ct in (ContentType.MARKDOWN, ContentType.DOCX, ContentType.PPTX):
             return RecursiveCharacterTextSplitter(
                 separators=["\n## ", "\n### ", "\n#### ", "\n\n", "\n", " ", ""],
-                chunk_size=settings.chunk_size,
-                chunk_overlap=settings.chunk_overlap,
+                chunk_size=self.config.chunk_size,
+                chunk_overlap=self.config.chunk_overlap,
                 length_function=self._len_fn,
             )
         return RecursiveCharacterTextSplitter(
-            chunk_size=settings.chunk_size,
-            chunk_overlap=settings.chunk_overlap,
+            chunk_size=self.config.chunk_size,
+            chunk_overlap=self.config.chunk_overlap,
             length_function=self._len_fn,
             add_start_index=True,
         )
@@ -272,7 +276,7 @@ class HybridChunker:
         segments = self.semantic.split(text, content_type)
         final: list[str] = []
         for seg in segments:
-            if self._len_fn(seg) <= settings.chunk_size:
+            if self._len_fn(seg) <= self.config.chunk_size:
                 final.append(seg)
             else:
                 final.extend(splitter.split_text(seg))
@@ -282,8 +286,8 @@ class HybridChunker:
                 content=seg,
                 source=source,
                 chunk_index=i,
-                content_type=content_type,
-                metadata=metadata,
+                doc_id=metadata.get("doc_id", ""),
+                metadata={k: v for k, v in metadata.items() if k != "doc_id"},
             )
             for i, seg in enumerate(final)
             if seg.strip()
@@ -320,25 +324,21 @@ class DocumentIngestionPipeline:
 
         if not chunks:
             logger.info(f"No chunks produced for {source!r}")
+            latency = round((time.perf_counter() - t0) * 1000, 2)
             return IngestResponse(
-                document_id=doc_id, source=source, num_chunks=0,
-                content_type=ct.value, latency_ms=0.0,
+                document_id=doc_id, source=source, chunks_created=0,
+                content_type=ct.value, processing_ms=latency,
             )
 
-        loop = asyncio.get_event_loop()
-        embeddings = await loop.run_in_executor(
-            None,
-            lambda: get_embedder.embed(
-                [c.content for c in chunks],
-                normalize_embeddings=True,
-                batch_size=64,
-            ).astype(np.float32),
-        )
+        embedder = await get_embedder()
+        embeddings_list = await embedder.embed([c.content for c in chunks])
+        embeddings = np.array(embeddings_list, dtype=np.float32)
 
         for chunk, emb in zip(chunks, embeddings):
             chunk.embedding = emb.tolist()
 
-        await get_vector_store.add_chunks(chunks, embeddings)
+        vector_store = await get_vector_store()
+        await vector_store.add_chunks(chunks, embeddings)
         latency = round((time.perf_counter() - t0) * 1000, 2)
         logger.info(f"Ingested {source!r}  chunks={len(chunks)}  type={ct.value}  {latency}ms")
 
@@ -347,5 +347,5 @@ class DocumentIngestionPipeline:
             source=source,
             chunks_created=len(chunks),
             content_type=ct.value,
-            latency_ms=latency,
+            processing_ms=latency,
         )
