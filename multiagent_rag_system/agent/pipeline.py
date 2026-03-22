@@ -18,22 +18,22 @@ import time
 from typing import AsyncIterator, Optional
 from ..src.observability.observability import traced
 
-
 from ..src.utils.config_loader import get_settings
 from ..src.logger.logger import GLOBAL_LOGGER as logger
 from ..src.exception.custom_exception import MulitagentragException
 from ..src.models.models import (
     AgentEvent, QueryRequest, QueryResponse)
-
-from query_expansion import QueryExpansionAgent
-from evaluator import RAGASEvaluator
-from confidence_score_agent import ConfidenceScoringAgent
-from consensus_agent import ConsensusAgent
-from claim_verification_agent import ClaimVerificationAgent
-from reranker_agent import RerankerAgent
-from retrieval_agent import ChunkRetrieval
 from ..src.utils.general_utils import _timed_event
 from ..src.cache.cache import CacheClient
+
+from ..agent.query_expansion import QueryExpansionAgent
+from ..agent.evaluator import RAGASEvaluator
+from ..agent.confidence_score_agent import ConfidenceScoringAgent
+from ..agent.consensus_agent import ConsensusAgent
+from ..agent.claim_verification_agent import ClaimVerificationAgent
+from ..agent.reranker_agent import RerankerAgent
+from ..agent.retrieval_agent import ChunkRetrieval
+
 
 settings = get_settings()
 
@@ -63,7 +63,7 @@ class RAGOrchestrator:
         trace: list[AgentEvent] = []
 
         # 1.Cache check — return immediately on hit
-        cached = await self.cache.get(query.text)
+        cached = await self.cache.get(query.query)
         if cached:
             cached.latency_ms = round((time.perf_counter() - t_total) * 1000, 2)
             logger.info(f"[Orchestrator] cache HIT  latency={cached.latency_ms:.0f}ms")

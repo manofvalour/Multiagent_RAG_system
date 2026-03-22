@@ -11,7 +11,7 @@ from typing import Optional
 
 from ..src.utils.config_loader import get_settings
 from ..src.models.models import RAGASScores, RerankedChunk
-from src.logger.logger import GLOBAL_LOGGER as logger
+from ..src.logger.logger import GLOBAL_LOGGER as logger
 
 settings = get_settings()
 

@@ -8,7 +8,7 @@ from ..src.utils.config_loader import get_settings
 from ..src.logger.logger import GLOBAL_LOGGER as logger
 from ..src.exception.custom_exception import MulitagentragException
 from ..src.models.models import (
-    AgentEvent, AgentStatus, Claim,RerankedChunk)
+    AgentEvent, AgentStatus, Claim, RerankedChunk, RetrievedChunk)
 from ..src.utils.general_utils import _overlap_ratio, _timed_event
 from ..src.llm.llm import BaseLLMClient, get_llm_client
 

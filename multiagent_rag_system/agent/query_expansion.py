@@ -20,13 +20,12 @@ settings = get_settings()
 
 class QueryExpansionAgent:
     def __init__(
-        self,
-        api_key:str= settings.groq_api_key.get_secret_value(),
-    ) -> None:
+        self) -> None:
 
         self._groqai: Optional[AsyncGroq] = None
-        self.api_key = api_key
-        self.config = settings.llm_providers[settings.active_llm]
+        self.api_key = settings.groq_api_key.get_secret_value()
+        self.config = settings.query_expansion
+        self.model_config = settings.llm_providers[settings.active_llm]
 
     def _client(self) -> AsyncGroq:
         if self._groqai is None:
@@ -39,14 +38,14 @@ class QueryExpansionAgent:
           expanded_queries — list of strings for the retriever
           hyde_doc — hypothetical answer text (or None)
         """
-        if not settings.enable_expansion:
+        if not self.config.enabled:
             return [query.query], None
 
-        if settings.expansion_strategy == "hyde":
+        if self.config.strategy == "hyde":
             hyde_doc = await self._hyde(query.query)
             return [query.query, hyde_doc], hyde_doc
 
-        elif settings.expansion_strategy == "multi_query":
+        elif self.config.strategy == "multi_query":
             variants = await self._multi_query(query.query)
             return [query.query] + variants, None
 
@@ -69,9 +68,9 @@ class QueryExpansionAgent:
             f"Paragraph (3-5 sentences, use domain-specific terminology):"
         )
         resp = await self._client().chat.completions.create(
-            model=self.config.model_name,
+            model=self.model_config.model_name,
             messages=[{"role": "user", "content": prompt}],
-            temperature = settings.hyde_temperature,
+            temperature = self.config.hyde_temperature,
             max_tokens=256,
         )
         result = resp.choices[0].message.content.strip()
@@ -81,16 +80,16 @@ class QueryExpansionAgent:
     async def _multi_query(self, query: str) -> list[str]:
         """Generate N rephrased versions of the query."""
         prompt = (
-            f"Generate {settings.num_queries} different ways to ask the following question.\n"
+            f"Generate {self.config.num_queries} different ways to ask the following question.\n"
             f"Each rephrasing should approach it from a different angle.\n"
             f"Output one rephrasing per line, no numbering or bullets.\n\n"
             f"Original: {query}\n\nRephrasings:"
         )
         resp = await self._client().chat.completions.create(
-            model=self.config.model_name,
+            model=self.model_config.model_name,
             messages=[{"role": "user", "content": prompt}],
             temperature=0.8,
             max_tokens=256,
         )
         lines = resp.choices[0].message.content.strip().splitlines()
-        return [l.strip() for l in lines if l.strip()][: settings.num_queries]
+        return [l.strip() for l in lines if l.strip()][: self.config.num_queries]

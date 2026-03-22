@@ -1,38 +1,12 @@
 """
-tests/test_vector_store.py
-
 Unit tests for VectorStore using a real in-process Qdrant instance.
 No network required — uses local mode (QdrantClient(path=...)).
-
-Design decisions
-----------------
-* Every test gets its own tmp_path-backed Qdrant directory AND its own
-  unique collection name via monkeypatching Settings fields.  This gives
-  full isolation without any shared mutable state between tests.
-
-* We monkeypatch the settings singleton rather than replacing the module-
-  level `settings` variable inside vector_store.py, because that variable
-  is read at call time (inside methods), not at import time.
-
-* DocumentChunk.doc_id is a first-class field (not buried in metadata).
-  The upsert code hoists it to a top-level Qdrant payload field, and the
-  delete filter matches on that same field.
-
-* All embeddings are L2-normalised before insertion so cosine similarity
-  behaves correctly (score in [-1, 1], higher = more similar).
-
-* search() is called with threshold=0.0 unless a specific threshold is
-  under test, to avoid flaky failures caused by random vector geometry.
 """
 from __future__ import annotations
 
 import uuid
 import numpy as np
 import pytest
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
 def _norm(arr: np.ndarray) -> np.ndarray:
     """Row-wise L2 normalisation."""
@@ -51,7 +25,7 @@ def _make_chunk(
     doc_id: str = "doc-001",
     source: str = "test.txt",
     dim: int = 8,
-) -> "DocumentChunk":
+) -> DocumentChunk:
     """
     Build a deterministic DocumentChunk with a valid UUID id.
     idx must be in [0, 99] to keep the UUID pattern valid.
@@ -63,7 +37,6 @@ def _make_chunk(
         content=f"chunk content number {idx}",
         source=source,
         chunk_index=idx,
-        content_type=ContentType.PROSE,
         doc_id=doc_id,          # top-level field — hoisted into Qdrant payload
         metadata={"test": True},
     )

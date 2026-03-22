@@ -35,7 +35,7 @@ class ConfidenceScoringAgent:
             sum(1 for c in claims if c.supported)/max(len(claims), 1)
         )
         avg_relevance = (
-            sum(rc.relevance_score for rc in chunks)/ max(len(chunks),1)
+            sum(rc.reranker_score for rc in chunks)/ max(len(chunks),1)
         )
 
         src_text = " ".join(rc.chunk.content for rc in chunks)

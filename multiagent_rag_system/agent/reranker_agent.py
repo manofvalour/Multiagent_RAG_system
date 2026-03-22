@@ -33,7 +33,7 @@ class RerankerAgent:
                   chunks: list[RetrievedChunk]) -> tuple[list[RerankedChunk], AgentEvent]:
         t0 = time.perf_counter()
 
-        if not self.reranker.enabled or not chunks:
+        if not self.config.enabled or not chunks:
             reranked = [RerankedChunk(
                     chunk=c.chunk,
                     similarity_score=c.vector_score,

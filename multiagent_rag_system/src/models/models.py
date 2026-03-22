@@ -79,7 +79,7 @@ class Claim(BaseModel):
     text: str
     supported: bool = False
     confidence: float = Field(ge=0.0, le=1.0, default=0.0)
-    supporting_chunks: list[RetrievedChunk] = Field(default_factory=list)
+    supporting_chunks: list[RerankedChunk] = Field(default_factory=list)
 
 ## query pipeline
 class QueryRequest(BaseModel):
