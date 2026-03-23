@@ -5,9 +5,9 @@ Unit tests for the ClaimVerificationAgent — LLM + lexical claim verification
 from __future__ import annotations
 
 import json
-from typing import Optional
 from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
+import unittest
 
 from ..models.models import (ContentType, DocumentChunk, 
                                  QueryResponse,
@@ -30,7 +30,6 @@ def _make_doc(i: int, content: str = None) -> DocumentChunk:
 @pytest.fixture
 def docs():
     return [_make_doc(i) for i in range(1, 4)]
-
 
 @pytest.fixture
 def retrieved_chunks(docs) -> list[RetrievedChunk]:

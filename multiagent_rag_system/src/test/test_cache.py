@@ -20,8 +20,6 @@ import pytest
 from ..cache.cache import (
     CacheClient,
     SemanticCache,
-    _InMemoryCache,
-    _FakePipeline,
     _query_cache_key,
     _rate_limit_key,
 )
@@ -39,11 +37,15 @@ def _unit_vec(dim: int = 4) -> np.ndarray:
 
 def _make_response(qid: str = "test-qid", answer: str = "Test answer") -> QueryResponse:
     return QueryResponse(
-        query_id=qid,
+        request_id=qid,
         answer=answer,
-        sources=["doc.txt"],
+        claims=["doc.txt"],
         retrieved_chunks=[],
         reranked_chunks=[],
+        expanded_queries=[],
+        confidence=[],
+        hallucination_risk=0.0,
+        agent_trace=[],
     )
 
 

@@ -26,7 +26,7 @@ class EmbeddingProvider:
     def __init__(self):
         self._model = None
         self._lock = asyncio.Lock()
-        self._cache: dict[str, list[float]]= {}
+       # self._cache: dict[str, list[float]]= {}
         self.config = settings.embeddings
 
     async def _load(self):
@@ -55,14 +55,14 @@ class EmbeddingProvider:
         to_encode: list[tuple[int, str]]=[]
 
         for i, text in enumerate(texts):
-            key = text[:200]
-            if key in self._cache:
-                results.append((i, self._cache[key]))
+            #key = text[:200]
+            #if key in self._cache:
+             ##   results.append((i, self._cache[key]))
 
-            else:
-                to_encode.append((i, text))
+            #else:
+            to_encode.append((i, text))
 
-        if to_encode and self._model is not None:
+        if self._model is not None:
             loop = asyncio.get_event_loop()
             raw = await loop.run_in_executor(
                 None,
@@ -75,7 +75,7 @@ class EmbeddingProvider:
             )
 
             for (i, text), vec in zip(to_encode, raw):
-                self._cache[text[:200]]= vec
+               # self._cache[text[:200]]= vec
                 results.append((i, vec))
 
         elif to_encode:

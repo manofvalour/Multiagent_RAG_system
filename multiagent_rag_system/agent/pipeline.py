@@ -2,10 +2,10 @@
 Wires all agents into a single async pipeline.
 
 Non-streaming flow:
-  cache → expand → retrieve → rerank → generate → cache + evaluate
+  cache -> expand -> retrieve -> rerank -> generate -> cache + evaluate
 
 Streaming flow:
-  cache → expand → retrieve → rerank → stream tokens → cache + evaluate
+  cache -> expand -> retrieve -> rerank -> stream tokens -> cache + evaluate
 """
 
 
@@ -22,9 +22,10 @@ from ..src.utils.config_loader import get_settings
 from ..src.logger.logger import GLOBAL_LOGGER as logger
 from ..src.exception.custom_exception import MulitagentragException
 from ..src.models.models import (
-    AgentEvent, QueryRequest, QueryResponse)
-from ..src.utils.general_utils import _timed_event
-from ..src.cache.cache import CacheClient
+    AgentEvent, QueryRequest, QueryResponse, 
+    HallucinationRisk, ConfidenceBreakdown)
+
+from ..src.cache.cache import SemanticCache
 
 from ..agent.query_expansion import QueryExpansionAgent
 from ..agent.evaluator import RAGASEvaluator
@@ -41,7 +42,7 @@ settings = get_settings()
 class RAGOrchestrator:
     def __init__(
         self, expansion:QueryExpansionAgent, retriever: ChunkRetrieval, 
-        reranker:RerankerAgent, consensus:ConsensusAgent, cache:CacheClient, 
+        reranker:RerankerAgent, consensus:ConsensusAgent, cache:SemanticCache, 
         evaluator: RAGASEvaluator, confidence_score: ConfidenceScoringAgent,
         claim_verification: ClaimVerificationAgent
     ) -> None:
@@ -79,12 +80,15 @@ class RAGOrchestrator:
 
         if not retrieved:
             return QueryResponse(
-                query_id=query.id,
+                request_id=query.id,
+                query=query.query,
                 answer="I could not find relevant information to answer your question.",
-                sources=[], 
+                claims=[],
                 retrieved_chunks=[],
                 reranked_chunks=[],
                 expanded_queries=expanded_queries,
+                confidence=ConfidenceBreakdown(claim_support=0.0, avg_relevance=0.0, source_overlap=0.0, final=0.0),
+                hallucination_risk=HallucinationRisk.MEDIUM,
                 latency_ms=ev.duration_ms,
             )
 
@@ -99,30 +103,24 @@ class RAGOrchestrator:
         if not isinstance(answer, str):
             answer = "".join([tok async for tok in answer])
 
-        # Claim verification and confidence scoring (running concurrently)
-        (claims, ev_claims), (confidence_score, hallucination_risk, ev_score) = await asyncio.gather(
-            self.claim_verifier.run(answer, reranked),
-            self.confidence_scorer.run(answer, [], reranked))
-        trace.extend([ev_claims, ev_score])
+        # Claim verification and confidence scoring (running claims first, then scoring)
+        claims, ev_claims = await self.claim_verifier.run(answer, reranked)
+        trace.append(ev_claims)
 
-        confidence_score, hallucination_risk, ev_final = await self.confidence_scorer.run(answer, claims, reranked)
-        trace.append(ev_final)
+        confidence_score, hallucination_risk, ev_score = await self.confidence_scorer.run(answer, claims, reranked)
+        trace.append(ev_score)
 
-
-        #8. Build response
-        sources  = list(dict.fromkeys(c.chunk.source for c in reranked))
-
+        # 8. Build response
         response = QueryResponse(
-            query_id=query.id,
+            request_id=query.id,
             query=query.query,
             answer=answer,
-            sources=sources,
             retrieved_chunks=retrieved,
             reranked_chunks=reranked,
             expanded_queries=expanded_queries,
             confidence=confidence_score,
-            claims = claims,
-            hallucination_risk= hallucination_risk,
+            claims=claims,
+            hallucination_risk=hallucination_risk,
             latency_ms=round((time.perf_counter()- t_total)*1000, 2),
             agent_trace=trace if query.include_trace else [],
         )

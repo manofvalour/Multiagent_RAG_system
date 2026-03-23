@@ -15,8 +15,8 @@ from fastapi.responses import JSONResponse, PlainTextResponse
 
 import structlog
 
-from multiagent_rag_system.agent.chunk_retrieval import DocumentIngestionPipeline
-from multiagent_rag_system.agent.pipeline import MultiAgentRAGPipeline
+from multiagent_rag_system.agent.doc_ingestion import DocumentIngestionPipeline
+from multiagent_rag_system.agent.pipeline import RAGOrchestrator
 from multiagent_rag_system.src.cache.cache import CacheClient
 from multiagent_rag_system.src.utils.config_loader import get_settings
 from multiagent_rag_system.src.logger.logger import GLOBAL_LOGGER as logger
@@ -24,16 +24,18 @@ from multiagent_rag_system.src.models.models import (
     HealthComponent, HealthResponse, IngestRequest, IngestResponse,
     QueryRequest, QueryResponse, QueryMetrics,
 )
-from multiagent_rag_system.src.database.vector_store import get_embedder, get_vector_store
+from multiagent_rag_system.src.database.vector_store import get_vector_store
+from multiagent_rag_system.src.embedding.embedding import get_embedder
 from multiagent_rag_system.src.utils.metrics import (
-    get_metrics_output, record_ingestion, record_query, track_request, update_store_size
+    get_metrics_output, record_ingestion, record_query, 
+    track_request, update_store_size
 )
 
 
 settings = get_settings()
 
 # ─── Singletons initialised at startup ───────────────────────────────────────
-_pipeline: Optional[MultiAgentRAGPipeline] = None
+_pipeline: Optional[RAGOrchestrator] = None
 _ingestion: Optional[DocumentIngestionPipeline] = None
 _cache: Optional[CacheClient] = None
 _start_time: float = 0.0
@@ -49,7 +51,7 @@ async def lifespan(app: FastAPI):
     await get_embedder()
     await get_vector_store()
 
-    _pipeline  = MultiAgentRAGPipeline()
+    _pipeline  = RAGOrchestrator()
     _ingestion = DocumentIngestionPipeline()
     _cache     = CacheClient()
 
