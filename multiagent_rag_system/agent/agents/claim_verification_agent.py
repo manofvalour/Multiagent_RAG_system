@@ -4,13 +4,13 @@ import re
 import time
 from typing import Optional
 
-from ..src.utils.config_loader import get_settings
-from ..src.logger.logger import GLOBAL_LOGGER as logger
-from ..src.exception.custom_exception import MulitagentragException
-from ..src.models.models import (
+from multiagent_rag_system.src.utils.config_loader import get_settings
+from multiagent_rag_system.src.logger.logger import GLOBAL_LOGGER as logger
+from multiagent_rag_system.src.exception.custom_exception import MulitagentragException
+from multiagent_rag_system.src.models.models import (
     AgentEvent, AgentStatus, Claim, RerankedChunk, RetrievedChunk)
-from ..src.utils.general_utils import _overlap_ratio, _timed_event
-from ..src.llm.llm import BaseLLMClient, get_llm_client
+from multiagent_rag_system.src.utils.general_utils import _overlap_ratio, _timed_event
+from multiagent_rag_system.src.llm.llms import BaseLLMClient, get_llm_client
 
 settings = get_settings()
 

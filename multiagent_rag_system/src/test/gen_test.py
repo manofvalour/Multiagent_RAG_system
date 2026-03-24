@@ -10,7 +10,7 @@ import pytest
 from ..models.models import (DocumentChunk, 
                                  AgentStatus, Claim,
                                  RerankedChunk, RetrievedChunk)
-from ..llm.llm import LLMResponse
+from ..llm.llms import LLMResponse
 
 #Shared fixtures
 def _make_doc(i: int, content: str = None) -> DocumentChunk:
@@ -74,7 +74,7 @@ class TestAnswerGeneratorAgent:
     """
 
     def _make_agent(self, mock_llm, agent_id: int = 0):
-        from multiagent_rag_system.agent.answer_generator_agent import AnswerGeneratorAgent
+        from multiagent_rag_system.agent.agents.answer_generator_agent import AnswerGeneratorAgent
         agent = AnswerGeneratorAgent(llm=mock_llm, agent_id=agent_id)
         
         # Override config.top_n so we don't need real settings

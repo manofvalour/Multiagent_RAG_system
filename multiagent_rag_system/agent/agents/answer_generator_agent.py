@@ -4,13 +4,13 @@ import time
 from typing import Optional
 import numpy as np
 
-from ..src.utils.config_loader import get_settings
-from ..src.logger.logger import GLOBAL_LOGGER as logger
-from ..src.exception.custom_exception import MulitagentragException
-from ..src.models.models import (
+from ...src.utils.config_loader import get_settings
+from ...src.logger.logger import GLOBAL_LOGGER as logger
+from ...src.exception.custom_exception import MulitagentragException
+from ...src.models.models import (
     AgentEvent, AgentStatus, RetrievedChunk)
-from ..src.utils.general_utils import _timed_event
-from ..src.llm.llm import BaseLLMClient, LLMResponse, get_llm_client
+from ...src.utils.general_utils import _timed_event
+from ...src.llm.llms import BaseLLMClient, LLMResponse, get_llm_client
 
 settings= get_settings()
 class AnswerGeneratorAgent:

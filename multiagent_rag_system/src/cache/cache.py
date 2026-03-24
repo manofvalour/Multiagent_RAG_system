@@ -85,9 +85,9 @@ class SemanticCache:
     Falls back silently to no-op when Redis is unavailable (self._client is None).
     """
 
-    def __init__(self) -> None:
-        self.cfg = settings.cache #CacheConfig
-        self.embed_model = get_embedder()
+    def __init__(self, config=None, redis_url: str = None, embed_model=None) -> None:
+        self.config = config or settings.cache #CacheConfig
+        self.embed_model = embed_model or get_embedder()
         self._r = None #set in connect()
 
     #Lifecycle
@@ -107,9 +107,9 @@ class SemanticCache:
     #Similarity lookup
     async def get(self, query: str) -> Optional[QueryResponse]:
         """Return a cached RAGResponse if a similar-enough query exists."""
+        
         r = await self._client()
-
-        if not r and not self.cfg.enabled:
+        if not r or not self.config.enabled:
             return None
 
         q_emb = self.embed_model.embed(query)
@@ -127,7 +127,7 @@ class SemanticCache:
             if score > best_score:
                 best_score, best_id = score, cid
 
-        if best_score >= self.cfg.similarity_threshold and best_id:
+        if best_score >= self.config.similarity_threshold and best_id:
             raw_resp = await r.get(f"cache:{best_id}:resp")
             if raw_resp:
                 resp = QueryResponse(**json.loads(raw_resp))
@@ -138,16 +138,19 @@ class SemanticCache:
 
     async def set(self, query: str, response: QueryResponse) -> None:
         """Store a query embedding and its QueryResponse with TTL."""
+        
         r = await self._client()
-        if not r or not self.cfg.enabled:
+        if not r or not self.config.enabled:
             return
 
         qid = response.request_id
         emb = self.embed_model.embed(query)
 
         pipe = r.pipeline()
-        pipe.set(f"cache:{qid}:emb", json.dumps(emb), ex=self.cfg.ttl_seconds)
-        pipe.set(f"cache:{qid}:resp", response.model_dump_json(), ex=self.cfg.ttl_seconds)
+        # Convert numpy array to list for JSON serialization
+        emb_list = emb.tolist() if hasattr(emb, 'tolist') else list(emb)
+        pipe.set(f"cache:{qid}:emb", json.dumps(emb_list), ex=self.config.ttl_seconds)
+        pipe.set(f"cache:{qid}:resp", response.model_dump_json(), ex=self.config.ttl_seconds)
         pipe.sadd("cache:index", qid)
         await pipe.execute()
 
@@ -299,3 +302,4 @@ class CacheClient:
             return (time.perf_counter() - t0) * 1000
         except Exception as e:
             logger.error("Redis not available", error = str(e))
+            raise

@@ -16,24 +16,24 @@ import time
 import asyncio
 import time
 from typing import AsyncIterator, Optional
-from ..src.observability.observability import traced
+from multiagent_rag_system.src.observability.observability import traced
 
-from ..src.utils.config_loader import get_settings
-from ..src.logger.logger import GLOBAL_LOGGER as logger
-from ..src.exception.custom_exception import MulitagentragException
-from ..src.models.models import (
+from multiagent_rag_system.src.utils.config_loader import get_settings
+from multiagent_rag_system.src.logger.logger import GLOBAL_LOGGER as logger
+from multiagent_rag_system.src.exception.custom_exception import MulitagentragException
+from multiagent_rag_system.src.models.models import (
     AgentEvent, QueryRequest, QueryResponse, 
     HallucinationRisk, ConfidenceBreakdown)
 
-from ..src.cache.cache import SemanticCache
+from multiagent_rag_system.src.cache.cache import SemanticCache
 
-from ..agent.query_expansion import QueryExpansionAgent
-from ..agent.evaluator import RAGASEvaluator
-from ..agent.confidence_score_agent import ConfidenceScoringAgent
-from ..agent.consensus_agent import ConsensusAgent
-from ..agent.claim_verification_agent import ClaimVerificationAgent
-from ..agent.reranker_agent import RerankerAgent
-from ..agent.retrieval_agent import ChunkRetrieval
+from ..agents.query_expansion import QueryExpansionAgent
+from ..agents.evaluator import RAGASEvaluator
+from ..agents.confidence_score_agent import ConfidenceScoringAgent
+from ..agents.consensus_agent import ConsensusAgent
+from ..agents.claim_verification_agent import ClaimVerificationAgent
+from ..agents.reranker_agent import RerankerAgent
+from ..agents.retrieval_agent import ChunkRetrieval
 
 
 settings = get_settings()
@@ -41,10 +41,10 @@ settings = get_settings()
 
 class RAGOrchestrator:
     def __init__(
-        self, expansion:QueryExpansionAgent, retriever: ChunkRetrieval, 
-        reranker:RerankerAgent, consensus:ConsensusAgent, cache:SemanticCache, 
-        evaluator: RAGASEvaluator, confidence_score: ConfidenceScoringAgent,
-        claim_verification: ClaimVerificationAgent
+        self, expansion=QueryExpansionAgent, retriever= ChunkRetrieval(), 
+        reranker=RerankerAgent, consensus=ConsensusAgent, cache=SemanticCache(), 
+        evaluator= RAGASEvaluator(), confidence_score= ConfidenceScoringAgent,
+        claim_verification= ClaimVerificationAgent()
     ) -> None:
         
         self.expansion = expansion

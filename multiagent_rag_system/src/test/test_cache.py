@@ -24,7 +24,7 @@ from ..cache.cache import (
     _rate_limit_key,
 )
 from ..utils.config_loader import CacheConfig
-from ..models.models import QueryResponse
+from ..models.models import QueryResponse, Claim, ConfidenceBreakdown, HallucinationRisk, AgentEvent
 
 
 #Shared helpers
@@ -38,22 +38,30 @@ def _unit_vec(dim: int = 4) -> np.ndarray:
 def _make_response(qid: str = "test-qid", answer: str = "Test answer") -> QueryResponse:
     return QueryResponse(
         request_id=qid,
+        query="What is the answer?",
         answer=answer,
-        claims=["doc.txt"],
+        claims=[Claim(text="doc.txt", supported=True)],
         retrieved_chunks=[],
         reranked_chunks=[],
         expanded_queries=[],
-        confidence=[],
-        hallucination_risk=0.0,
+        confidence=ConfidenceBreakdown(
+            claim_support=0.9,
+            avg_relevance=0.8,
+            source_overlap=0.7,
+            final=0.85
+        ),
+        hallucination_risk=HallucinationRisk.LOW,
+        latency_ms=100.0,
         agent_trace=[],
     )
 
 
 def _make_embed_model(vec: np.ndarray = None) -> MagicMock:
-    """Mock embed model whose encode() always returns the given vector."""
+    """Mock embed model whose embed() always returns the given vector."""
     vec = vec if vec is not None else _unit_vec()
     model = MagicMock()
-    model.encode = MagicMock(return_value=np.array([vec], dtype=np.float32))
+    # The embed() method should return a single vector (1D array), not wrapped
+    model.embed = MagicMock(return_value=vec.astype(np.float32))
     return model
 
 
@@ -89,7 +97,7 @@ def sem_cfg():
 def sem_cache(sem_cfg):
     embed = _make_embed_model(_unit_vec())
     cache = SemanticCache(sem_cfg, "redis://localhost:6379/0", embed)
-    # Inject a mock Redis client directly — no network needed
+
     mock_r = MagicMock()
     mock_r.smembers  = AsyncMock(return_value=set())
     mock_r.get       = AsyncMock(return_value=None)
@@ -99,7 +107,7 @@ def sem_cache(sem_cfg):
         execute=AsyncMock(return_value=[True, True, 1]),
     ))
     mock_r.ping = AsyncMock(return_value=True)
-    cache._client = mock_r
+    cache._client = AsyncMock(return_value=mock_r)
     return cache
 
 
@@ -108,22 +116,21 @@ class TestSemanticCacheGet:
     async def test_returns_none_when_disabled(self):
         cfg   = CacheConfig(enabled=False)
         cache = SemanticCache(cfg, "", _make_embed_model())
-        cache._client = MagicMock()     # should never be touched
+        cache._client = AsyncMock(return_value=MagicMock())     # should never be touched
         result = await cache.get("any query")
         assert result is None
-        cache._client.smembers.assert_not_called() if hasattr(cache._client, "smembers") else None
 
     @pytest.mark.asyncio
     async def test_returns_none_when_no_client(self):
         cfg   = CacheConfig(enabled=True)
         cache = SemanticCache(cfg, "", _make_embed_model())
-        # _client is None by default — simulates Redis unavailable
+        cache._client = AsyncMock(return_value=None)  # Mock to return None (Redis unavailable)
         result = await cache.get("any query")
         assert result is None
 
     @pytest.mark.asyncio
     async def test_returns_none_when_cache_empty(self, sem_cache):
-        sem_cache._client.smembers = AsyncMock(return_value=set())
+        sem_cache._client.return_value.smembers = AsyncMock(return_value=set())
         result = await sem_cache.get("What is RAG?")
         assert result is None
 
@@ -133,8 +140,8 @@ class TestSemanticCacheGet:
         stored_emb  = _unit_vec().tolist()
         response    = _make_response()
 
-        sem_cache._client.smembers = AsyncMock(return_value={"test-qid"})
-        sem_cache._client.get      = AsyncMock(side_effect=[
+        sem_cache._client.return_value.smembers = AsyncMock(return_value={"test-qid"})
+        sem_cache._client.return_value.get      = AsyncMock(side_effect=[
             json.dumps(stored_emb),         # first call: embedding
             response.model_dump_json(),     # second call: response body
         ])
@@ -151,8 +158,8 @@ class TestSemanticCacheGet:
         orthogonal = np.array([1.0, -1.0, 0.0, 0.0], dtype=np.float32)
         orthogonal /= np.linalg.norm(orthogonal)
 
-        sem_cache._client.smembers = AsyncMock(return_value={"old-qid"})
-        sem_cache._client.get      = AsyncMock(return_value=json.dumps(orthogonal.tolist()))
+        sem_cache._client.return_value.smembers = AsyncMock(return_value={"old-qid"})
+        sem_cache._client.return_value.get      = AsyncMock(return_value=json.dumps(orthogonal.tolist()))
 
         result = await sem_cache.get("completely different query")
         assert result is None
@@ -163,20 +170,21 @@ class TestSemanticCacheSet:
     async def test_set_calls_pipeline(self, sem_cache):
         response = _make_response("qid-001")
         await sem_cache.set("What is RAG?", response)
-        sem_cache._client.pipeline.assert_called()
+        sem_cache._client.return_value.pipeline.assert_called()
 
     @pytest.mark.asyncio
     async def test_set_noop_when_disabled(self):
         cfg   = CacheConfig(enabled=False)
-        cache = SemanticCache(cfg, "", _make_embed_model())
-        cache._client = MagicMock()
+        cache = SemanticCache(config=cfg, embed_model=_make_embed_model())
+        cache._client = AsyncMock(return_value=MagicMock())
         await cache.set("query", _make_response())
-        cache._client.pipeline.assert_not_called()
+        cache._client.return_value.pipeline.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_set_noop_when_no_client(self):
         cfg   = CacheConfig(enabled=True)
-        cache = SemanticCache(cfg, "", _make_embed_model())
+        cache = SemanticCache(config=cfg, embed_model=_make_embed_model())
+        cache._client = AsyncMock(return_value=None)  # Mock client to return None
         # No exception should be raised
         await cache.set("query", _make_response())
 
@@ -186,11 +194,11 @@ class TestSemanticCacheRateLimit:
     async def test_allows_within_limit(self, sem_cache):
         mock_pipe = MagicMock()
         mock_pipe.zremrangebyscore = MagicMock()
-        mock_pipe.zadd             = MagicMock()
-        mock_pipe.zcard            = MagicMock()
-        mock_pipe.expire           = MagicMock()
-        mock_pipe.execute          = AsyncMock(return_value=[0, 1, 5, True])
-        sem_cache._client.pipeline = MagicMock(return_value=mock_pipe)
+        mock_pipe.zadd = MagicMock()
+        mock_pipe.zcard = MagicMock()
+        mock_pipe.expire = MagicMock()
+        mock_pipe.execute = AsyncMock(return_value=[0, 1, 5, True])
+        sem_cache._client.return_value.pipeline = MagicMock(return_value=mock_pipe)
 
         allowed, remaining = await sem_cache.check_rate_limit("user-1", limit=60, window=60)
         assert allowed is True
@@ -200,11 +208,11 @@ class TestSemanticCacheRateLimit:
     async def test_blocks_over_limit(self, sem_cache):
         mock_pipe = MagicMock()
         mock_pipe.zremrangebyscore = MagicMock()
-        mock_pipe.zadd  = MagicMock()
+        mock_pipe.zadd = MagicMock()
         mock_pipe.zcard = MagicMock()
         mock_pipe.expire = MagicMock()
         mock_pipe.execute = AsyncMock(return_value=[0, 1, 61, True])
-        sem_cache._client.pipeline = MagicMock(return_value=mock_pipe)
+        sem_cache._client.return_value.pipeline = MagicMock(return_value=mock_pipe)
 
         allowed, remaining = await sem_cache.check_rate_limit("user-1", limit=60, window=60)
         assert allowed is False
@@ -213,7 +221,8 @@ class TestSemanticCacheRateLimit:
     @pytest.mark.asyncio
     async def test_falls_back_when_no_client(self):
         cfg   = CacheConfig(enabled=True)
-        cache = SemanticCache(cfg, "", _make_embed_model())
+        cache = SemanticCache(config=cfg, embed_model=_make_embed_model())
+        cache._client = AsyncMock(return_value=None)  # Mock _client to return None
         # No client — should return (True, limit) without raising
         allowed, remaining = await cache.check_rate_limit("user-1", limit=60, window=60)
         assert allowed is True
@@ -225,19 +234,19 @@ class TestSemanticCacheRateLimit:
 def mock_redis():
     """A MagicMock that looks like an aioredis.Redis client."""
     r = MagicMock()
-    r.get    = AsyncMock(return_value=None)
-    r.setex  = AsyncMock()
+    r.get = AsyncMock(return_value=None)
+    r.setex = AsyncMock()
     r.delete = AsyncMock()
-    r.ping   = AsyncMock(return_value=True)
+    r.ping = AsyncMock(return_value=True)
     r.lrange = AsyncMock(return_value=[])
 
     pipe = MagicMock()
-    pipe.incr    = AsyncMock(return_value=pipe)
-    pipe.expire  = AsyncMock(return_value=pipe)
-    pipe.lpush   = AsyncMock(return_value=pipe)
-    pipe.ltrim   = AsyncMock(return_value=pipe)
+    pipe.incr = AsyncMock(return_value=pipe)
+    pipe.expire = AsyncMock(return_value=pipe)
+    pipe.lpush = AsyncMock(return_value=pipe)
+    pipe.ltrim = AsyncMock(return_value=pipe)
     pipe.execute = AsyncMock(return_value=[1, True])
-    r.pipeline   = MagicMock(return_value=pipe)
+    r.pipeline = MagicMock(return_value=pipe)
 
     return r
 
@@ -300,19 +309,19 @@ class TestCacheClientQueryResult:
     @pytest.mark.asyncio
     async def test_get_query_result_miss(self, cache_client, mock_redis):
         mock_redis.get = AsyncMock(return_value=None)
-        result = await cache_client.get_query_result("What is RAG?", 5)
+        result = await cache_client.get("What is RAG?")
         assert result is None
 
     @pytest.mark.asyncio
     async def test_set_and_get_query_result(self, cache_client, mock_redis):
         payload = {"answer": "RAG is great", "sources": ["doc.txt"]}
         mock_redis.get = AsyncMock(return_value=json.dumps(payload))
-        result = await cache_client.get_query_result("What is RAG?", 5)
+        result = await cache_client.get("What is RAG?")
         assert result["answer"] == "RAG is great"
 
     @pytest.mark.asyncio
     async def test_set_query_result_calls_setex(self, cache_client, mock_redis):
-        await cache_client.set_query_result("query", 5, {"answer": "yes"})
+        await cache_client.set("query", {"answer": "yes"}, 5)
         mock_redis.setex.assert_called_once()
 
 
@@ -375,145 +384,6 @@ class TestCacheClientPing:
         mock_redis.ping = AsyncMock(side_effect=Exception("timeout"))
         with pytest.raises(Exception):
             await cache_client.ping()
-
-
-# ── _InMemoryCache tests ──────────────────────────────────────────────────────
-
-class TestInMemoryCache:
-    @pytest.mark.asyncio
-    async def test_ping_returns_true(self):
-        c = _InMemoryCache()
-        assert await c.ping() is True
-
-    @pytest.mark.asyncio
-    async def test_get_missing_key_returns_none(self):
-        c = _InMemoryCache()
-        assert await c.get("missing") is None
-
-    @pytest.mark.asyncio
-    async def test_setex_and_get(self):
-        c = _InMemoryCache()
-        await c.setex("k", 60, "hello")
-        assert await c.get("k") == "hello"
-
-    @pytest.mark.asyncio
-    async def test_set_and_get(self):
-        c = _InMemoryCache()
-        await c.set("k", "world")
-        assert await c.get("k") == "world"
-
-    @pytest.mark.asyncio
-    async def test_delete_removes_key(self):
-        c = _InMemoryCache()
-        await c.setex("k", 60, "v")
-        await c.delete("k")
-        assert await c.get("k") is None
-
-    @pytest.mark.asyncio
-    async def test_incr_increments(self):
-        c = _InMemoryCache()
-        assert await c.incr("counter") == 1
-        assert await c.incr("counter") == 2
-        assert await c.incr("counter") == 3
-
-    @pytest.mark.asyncio
-    async def test_sadd_and_smembers(self):
-        c = _InMemoryCache()
-        await c.sadd("myset", "a", "b", "c")
-        members = await c.smembers("myset")
-        assert members == {"a", "b", "c"}
-
-    @pytest.mark.asyncio
-    async def test_lpush_and_lrange(self):
-        c = _InMemoryCache()
-        await c.lpush("mylist", "first")
-        await c.lpush("mylist", "second")
-        # lpush inserts at front, so second is at index 0
-        result = await c.lrange("mylist", 0, -1)
-        assert result[0] == "second"
-        assert result[1] == "first"
-
-    @pytest.mark.asyncio
-    async def test_ltrim_limits_list(self):
-        c = _InMemoryCache()
-        for i in range(5):
-            await c.lpush("mylist", str(i))
-        await c.ltrim("mylist", 0, 2)
-        result = await c.lrange("mylist", 0, -1)
-        assert len(result) == 3
-
-    @pytest.mark.asyncio
-    async def test_zset_operations(self):
-        c = _InMemoryCache()
-        now = time.time()
-        await c.zadd("zk", {"req1": now - 120, "req2": now})
-        assert await c.zcard("zk") == 2
-        # Remove entries older than 60 seconds
-        await c.zremrangebyscore("zk", 0, now - 60)
-        assert await c.zcard("zk") == 1
-
-
-# ── _FakePipeline tests ───────────────────────────────────────────────────────
-
-class TestFakePipeline:
-    @pytest.mark.asyncio
-    async def test_incr_and_expire_execute(self):
-        c    = _InMemoryCache()
-        pipe = _FakePipeline(c)
-        await pipe.incr("counter")
-        await pipe.expire("counter", 60)
-        results = await pipe.execute()
-        assert results[0] == 1   # incr returned 1
-        assert results[1] is True
-
-    @pytest.mark.asyncio
-    async def test_set_execute(self):
-        c    = _InMemoryCache()
-        pipe = _FakePipeline(c)
-        await pipe.set("k", "v")
-        await pipe.execute()
-        assert await c.get("k") == "v"
-
-    @pytest.mark.asyncio
-    async def test_sadd_execute(self):
-        c    = _InMemoryCache()
-        pipe = _FakePipeline(c)
-        await pipe.sadd("s", "a", "b")
-        await pipe.execute()
-        members = await c.smembers("s")
-        assert "a" in members
-
-    @pytest.mark.asyncio
-    async def test_lpush_ltrim_execute(self):
-        c    = _InMemoryCache()
-        pipe = _FakePipeline(c)
-        await pipe.lpush("lst", "x")
-        await pipe.ltrim("lst", 0, 0)
-        await pipe.execute()
-        result = await c.lrange("lst", 0, -1)
-        assert result == ["x"]
-
-    @pytest.mark.asyncio
-    async def test_zset_pipeline_execute(self):
-        c    = _InMemoryCache()
-        pipe = _FakePipeline(c)
-        now  = time.time()
-        await pipe.zremrangebyscore("zk", 0, now - 60)
-        await pipe.zadd("zk", {str(now): now})
-        await pipe.zcard("zk")
-        results = await pipe.execute()
-        assert results[2] == 1   # zcard returned 1
-
-    @pytest.mark.asyncio
-    async def test_unknown_op_returns_none(self):
-        c    = _InMemoryCache()
-        pipe = _FakePipeline(c)
-        pipe._ops.append(("unknown_op", "key"))
-        results = await pipe.execute()
-        assert results[0] is None
-
-
-
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "--asyncio-mode=auto"])

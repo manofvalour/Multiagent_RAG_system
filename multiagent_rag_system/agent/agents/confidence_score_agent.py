@@ -4,14 +4,14 @@ import re
 import time
 from typing import Optional
 
-from ..src.utils.config_loader import get_settings
-from ..src.logger.logger import GLOBAL_LOGGER as logger
-from ..src.exception.custom_exception import MulitagentragException
-from ..src.models.models import (
+from multiagent_rag_system.src.utils.config_loader import get_settings
+from multiagent_rag_system.src.logger.logger import GLOBAL_LOGGER as logger
+from multiagent_rag_system.src.exception.custom_exception import MulitagentragException
+from multiagent_rag_system.src.models.models import (
     AgentEvent, AgentStatus, Claim, ConfidenceBreakdown,
     HallucinationRisk, RerankedChunk,
     )
-from ..src.utils.general_utils import _timed_event, _overlap_ratio
+from multiagent_rag_system.src.utils.general_utils import _timed_event, _overlap_ratio
 
 settings = get_settings()
 class ConfidenceScoringAgent:

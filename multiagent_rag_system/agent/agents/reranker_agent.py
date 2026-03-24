@@ -4,14 +4,14 @@ import asyncio
 import re
 import time
 
-from ..src.utils.config_loader import get_settings
-from ..src.logger.logger import GLOBAL_LOGGER as logger
-from ..src.exception.custom_exception import MulitagentragException
-from ..src.models.models import (
+from multiagent_rag_system.src.utils.config_loader import get_settings
+from multiagent_rag_system.src.logger.logger import GLOBAL_LOGGER as logger
+from multiagent_rag_system.src.exception.custom_exception import MulitagentragException
+from multiagent_rag_system.src.models.models import (
     AgentEvent, AgentStatus,
     RetrievedChunk, RerankedChunk
     )
-from ..src.utils.general_utils import _timed_event
+from multiagent_rag_system.src.utils.general_utils import _timed_event
 
 settings= get_settings()
         

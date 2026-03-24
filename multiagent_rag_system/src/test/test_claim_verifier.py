@@ -14,7 +14,7 @@ from ..models.models import (ContentType, DocumentChunk,
                                  AgentStatus, Claim,
                                  RerankedChunk, RetrievedChunk
 )
-from ..llm.llm import LLMResponse
+from ..llm.llms import LLMResponse
 
 def _make_doc(i: int, content: str = None) -> DocumentChunk:
     return DocumentChunk(
@@ -78,7 +78,7 @@ class TestClaimVerificationAgent:
     """
 
     def _make_agent(self, llm=None, use_llm: bool = True):
-        from multiagent_rag_system.agent.claim_verification_agent import ClaimVerificationAgent
+        from multiagent_rag_system.agent.agents.claim_verification_agent import ClaimVerificationAgent
         agent = ClaimVerificationAgent(llm=llm or MagicMock(), use_llm=use_llm)
         agent.config = MagicMock()
         agent.config.claim_support_threshold = 0.20

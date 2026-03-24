@@ -62,7 +62,7 @@ class VectorStore:
         def _build() -> QdrantClient:
             if self.config.url:
                 return QdrantClient(
-                    url=self.config.url,
+                    url=settings.qdrant_endpoint,
                     api_key=settings.qdrant_api_key or None,
                     timeout=30,
                 )

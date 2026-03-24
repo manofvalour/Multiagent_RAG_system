@@ -6,14 +6,14 @@ from collections import Counter
 from typing import Optional
 import numpy as np
 
-from ..src.utils.config_loader import get_settings
-from ..src.logger.logger import GLOBAL_LOGGER as logger
-from ..src.exception.custom_exception import MulitagentragException
-from ..src.models.models import (
+from multiagent_rag_system.src.utils.config_loader import get_settings
+from multiagent_rag_system.src.logger.logger import GLOBAL_LOGGER as logger
+from multiagent_rag_system.src.exception.custom_exception import MulitagentragException
+from multiagent_rag_system.src.models.models import (
     AgentEvent, AgentStatus, RetrievedChunk
     )
-from ..agent.answer_generator_agent import AnswerGeneratorAgent
-from ..src.utils.general_utils import _timed_event, _word_text
+from multiagent_rag_system.agent.agents.answer_generator_agent import AnswerGeneratorAgent
+from multiagent_rag_system.src.utils.general_utils import _timed_event, _word_text
 
 settings = get_settings()
 

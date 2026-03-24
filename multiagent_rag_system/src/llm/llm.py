@@ -1,5 +1,8 @@
 
 
+
+
+
 from __future__ import annotations
 import asyncio
 import time
@@ -57,9 +60,10 @@ class LLMLoader(BaseLLMClient):
 
         self.model: httpx.AsyncClient  = None
 
-    def _client(self):
-        if not self._client:
-            return self.model
+    async def _client(self):
+        if self.model:
+            return
+        
         self.model = httpx.AsyncClient(timeout=self.llm_config.timeout_seconds)
         return self.model
 
@@ -76,6 +80,7 @@ class LLMLoader(BaseLLMClient):
 
             t0 =time.perf_counter()
             config = self.llm_config
+            model = self._client()
             payload = {
                 "model": config.model_name,
                 "max_tokens": config.max_output_tokens,
@@ -84,7 +89,7 @@ class LLMLoader(BaseLLMClient):
                 "messages": [{"role": "user", "content": user}],
             }
 
-            resp = await self._client.post(self.base_url, headers=self._headers, json=payload)
+            resp = await model.post(self.base_url, headers=self._headers, json=payload)
             resp.raise_for_status()
             data = resp.json()
             model_name = config.model_name=='groq'
@@ -107,8 +112,8 @@ class LLMLoader(BaseLLMClient):
     
     async def health_check(self):
         try:
-            model_name = self.llm_config.model_name=='groq'
-            resp = await self._client.get("https://api.groq.com" if model_name else "https://api.anthropic.com", timeout=5)
+            model_name = settings.active_provider=='groq'
+            resp = await self.model.get("https://api.groq.com" if model_name else "https://api.anthropic.com", timeout=5)
             return resp.status_code < 500
         
         except Exception as e:
@@ -151,7 +156,8 @@ def get_llm_client()-> BaseLLMClient:
     else:
         provider = settings.active_provider
         try:
-            _client_instance = LLMLoader()
+            if provider == "groq" or "anthropic":
+                _client_instance = LLMLoader()
             logger.info("successfully loaded the model")
 
         except Exception as e:
@@ -162,14 +168,19 @@ def get_llm_client()-> BaseLLMClient:
     return _client_instance
 
 
+async def run_model():
+    model = get_llm_client()
+    await model.health_check()
 
 if __name__ == "__main__":
     try:
-        model = get_llm_client()
+        await run_model()
+        #model = get_llm_client()
+       # model.health_check()
 
         #print(config.model_json_schema)
-        print("we're live")
-        logger.info("ConfigLoader test run completed succesfully")
+        #print("we're live")
+        #logger.info("ConfigLoader test run completed succesfully")
     except Exception as e:
         raise MulitagentragException("failed to load the config file")
     

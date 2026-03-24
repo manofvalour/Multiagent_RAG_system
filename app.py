@@ -1,6 +1,6 @@
 """
-api/app.py — FastAPI application
-Routes: /query, /ingest, /documents, /health, /metrics, /analytics
+app.py -- FastAPI application
+Routes: /query,/ingest_text, /ingest_file, /delete_documents, /health, /metrics, /analytics
 Middleware: CORS, rate-limiting, request-id injection, structured logging
 """
 from __future__ import annotations
@@ -15,8 +15,8 @@ from fastapi.responses import JSONResponse, PlainTextResponse
 
 import structlog
 
-from multiagent_rag_system.agent.doc_ingestion import DocumentIngestionPipeline
-from multiagent_rag_system.agent.pipeline import RAGOrchestrator
+from multiagent_rag_system.agent.agents.doc_ingestion import DocumentIngestionPipeline
+from multiagent_rag_system.agent.pipeline.pipeline import RAGOrchestrator
 from multiagent_rag_system.src.cache.cache import CacheClient
 from multiagent_rag_system.src.utils.config_loader import get_settings
 from multiagent_rag_system.src.logger.logger import GLOBAL_LOGGER as logger
@@ -33,6 +33,7 @@ from multiagent_rag_system.src.utils.metrics import (
 
 
 settings = get_settings()
+config = settings.server
 
 # ─── Singletons initialised at startup ───────────────────────────────────────
 _pipeline: Optional[RAGOrchestrator] = None
@@ -56,8 +57,8 @@ async def lifespan(app: FastAPI):
     _cache     = CacheClient()
 
     # Seed knowledge base in dev mode
-    if settings.environment == "development":
-        await _seed_demo_data()
+    #if settings.environment == "development":
+     #   await _seed_demo_data()
 
     logger.info("startup_complete")
     yield
@@ -67,17 +68,16 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Multi-Agent RAG API",
     version=settings.app_version,
-    description="Production-grade RAG system with 5-agent hallucination reduction pipeline",
+    description="Production-grade RAG system with 7-agent hallucination reduction pipeline",
     lifespan=lifespan,
     docs_url="/docs",
     redoc_url="/redoc",
 )
 
-# ─── Middleware ───────────────────────────────────────────────────────────────
-
+#Middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins,
+    allow_origins=config.cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -98,6 +98,7 @@ async def request_middleware(request: Request, call_next):
                     method=request.method, path=request.url.path,
                     status=response.status_code, latency_ms=latency)
         return response
+    
     except Exception as e:
         logger.error("unhandled_error", error=str(e))
         return JSONResponse(status_code=500, content={"detail": "Internal server error"})
@@ -112,40 +113,25 @@ async def rate_limit(request: Request):
     if not allowed:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail=f"Rate limit exceeded. Max {settings.rate_limit_requests} requests per {settings.rate_limit_window_seconds}s",
-            headers={"Retry-After": str(settings.rate_limit_window_seconds)},
+            detail=f"Rate limit exceeded. Max {settings.cache.requests_per_minute} requests per {settings.cache.window_seconds}s",
+            headers={"Retry-After": str(settings.cache.window_seconds)},
         )
 
 
-# ─── Routes ───────────────────────────────────────────────────────────────────
-
+# API Routes
 @app.post("/query", response_model=QueryResponse, dependencies=[Depends(rate_limit)])
-async def query(req: QueryRequest, request: Request):
+async def query(req: QueryRequest):
     """
-    Run the full 5-agent RAG pipeline.
+    Run the full 7-agent RAG pipeline.
 
     - Checks query result cache first (Redis)
-    - Retrieves from FAISS vector store
-    - Runs: Validation → Consensus → Claim Verification → Confidence Scoring
+    - Retrieves from Qdrant vector store
+    - Runs: Retrieval -> Reranker -> Consensus -> Claim Verification -> Confidence Scoring
     - Returns grounded answer with full provenance
     """
     async with track_request():
-        # Cache check
-        cached_result = await _cache.get_query_result(req.query, req.top_k)
-        if cached_result:
-            logger.info("cache_hit", query=req.query[:60])
-            resp = QueryResponse(**cached_result)
-            resp.cached = True
-            return resp
-
-        # Retrieve from vector store
-        store = await get_vector_store()
-        embedder = await get_embedder()
-        query_emb = (await embedder.embed([req.query]))[0]
-        raw_chunks = await store.search(query_emb, top_k=req.top_k * 2)
-
         # Run pipeline
-        result = await _pipeline.run(req, raw_chunks)
+        result = await _pipeline.run(req)
 
         # Metrics
         n_supported = sum(1 for c in result.claims if c.supported)
@@ -156,20 +142,25 @@ async def query(req: QueryRequest, request: Request):
             cached=False,
             n_claims=len(result.claims),
             n_supported=n_supported,
-            n_chunks=len(result.retrieved_chunks),
+            n_chunks=len(result.reranked_chunks),
         )
-
-        # Cache and history
-        await _cache.set_query_result(req.query, req.top_k, result.model_dump())
-        await _cache.lpush_bounded("rag:history", result.model_dump())
 
         return result
 
 
-@app.post("/ingest", response_model=IngestResponse, status_code=status.HTTP_201_CREATED)
-async def ingest(req: IngestRequest):
-    """Ingest a document: chunk → embed → index in vector store."""
-    result = await _ingestion.ingest(req)
+@app.post("/ingest_text", response_model=IngestResponse, status_code=status.HTTP_201_CREATED)
+async def ingest_text(req: IngestRequest):
+    """Ingest a text document: chunk -> embed -> index in vector store."""
+    result = await _ingestion.ingest_text(req)
+    record_ingestion()
+    store = await get_vector_store()
+    update_store_size(await store.count())
+    return result
+
+@app.post("/ingest_file", response_model=IngestResponse, status_code=status.HTTP_201_CREATED)
+async def ingest_file(req: IngestRequest):
+    """Ingest a file(pdf, docx, images, or ppt): chunk -> embed -> index in vector store."""
+    result = await _ingestion.ingest_file(req)
     record_ingestion()
     store = await get_vector_store()
     update_store_size(await store.count())
@@ -210,7 +201,7 @@ async def health():
 
     # LLM
     try:
-        from .multiagent_rag_system.src.llm.llm import get_llm_client
+        from multiagent_rag_system.src.llm.llms import get_llm_client
         llm = get_llm_client()
         ok = await llm.health_check()
         components.append(HealthComponent(name="llm", healthy=ok, detail=type(llm).__name__))

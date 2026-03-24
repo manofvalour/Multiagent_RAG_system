@@ -4,15 +4,15 @@ import time
 from typing import Optional
 import numpy as np
 
-from ..src.utils.config_loader import get_settings
-from ..src.logger.logger import GLOBAL_LOGGER as logger
-from ..src.exception.custom_exception import MulitagentragException
-from ..src.models.models import (
+from multiagent_rag_system.src.utils.config_loader import get_settings
+from multiagent_rag_system.src.logger.logger import GLOBAL_LOGGER as logger
+from multiagent_rag_system.src.exception.custom_exception import MulitagentragException
+from multiagent_rag_system.src.models.models import (
     AgentEvent, AgentStatus,RetrievedChunk)
-from ..src.utils.general_utils import _timed_event
+from multiagent_rag_system.src.utils.general_utils import _timed_event
 
-from ..src.database.vector_store import get_vector_store
-from ..src.embedding.embedding import get_embedder
+from multiagent_rag_system.src.database.vector_store import get_vector_store
+from multiagent_rag_system.src.embedding.embedding import get_embedder
 
 settings = get_settings()
 

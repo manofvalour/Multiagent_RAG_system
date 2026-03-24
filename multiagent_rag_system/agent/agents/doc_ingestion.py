@@ -18,12 +18,12 @@ import numpy as np
 from langchain_text_splitters import Language, RecursiveCharacterTextSplitter
 from sklearn.metrics.pairwise import cosine_similarity
 
-from ..src.logger.logger import GLOBAL_LOGGER as logger
-from ..src.exception.custom_exception import MulitagentragException
-from ..src.embedding.embedding import get_embedder
-from ..src.database.vector_store import get_vector_store
-from ..src.utils.config_loader import get_settings
-from ..src.models.models import (
+from multiagent_rag_system.src.logger.logger import GLOBAL_LOGGER as logger
+from multiagent_rag_system.src.exception.custom_exception import MulitagentragException
+from multiagent_rag_system.src.embedding.embedding import get_embedder
+from multiagent_rag_system.src.database.vector_store import get_vector_store
+from multiagent_rag_system.src.utils.config_loader import get_settings
+from multiagent_rag_system.src.models.models import (
     ContentType,
     DocumentChunk,
     IngestRequest,
@@ -302,8 +302,8 @@ class DocumentIngestionPipeline:
     """
 
     def __init__(self) -> None:
-        self.parser       = FileParser()
-        self.chunker      = HybridChunker()
+        self.parser = FileParser()
+        self.chunker = HybridChunker()
 
     async def ingest_text(self, req: IngestRequest) -> IngestResponse:
         t0 = time.perf_counter()

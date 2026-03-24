@@ -81,7 +81,7 @@ class ExpansionStrategy(str, Enum):
 class LLMProviderConfig(BaseModel):
     """Config for a single LLM provider entry inside llm_providers."""
     base_url:          str   = "https://api.groq.com/openai/v1/chat/completions"
-    model_name:        str   = "llama-3.3-70b-versatile"
+    model_name:        str   = "openai/gpt-oss-120b"
     temperature:       float = Field(default=0.0,  ge=0.0, le=2.0)
     max_output_tokens: int   = Field(default=2048, ge=1)
     timeout_seconds:   int   = Field(default=30,   ge=1)
@@ -144,7 +144,7 @@ class CacheConfig(BaseModel):
 class VectorStoreConfig(BaseModel):
     """Qdrant vector store connection and HNSW index settings."""
     # Connection — server mode when url is set, local mode when url is ""
-    url: str = "http://localhost:6333"
+    url: str = ""
     api_key: str = ""           # override via QDRANT_API_KEY in .env
     collection_name: str = "rag_chunks"
     hnsw_m: int = 16   
@@ -240,6 +240,7 @@ class Settings(BaseSettings):
     groq_api_key: SecretStr = Field(default="", alias="GROQ_API_KEY")
     qdrant_api_key: SecretStr = Field(default="", alias="QDRANT_API_KEY")
     langsmith_api_key: SecretStr = Field(default="", alias="LANGSMITH_API_KEY")
+    qdrant_endpoint: SecretStr = Field(default="", alias = "QDRANT_ENDPOINT")
     redis_url: str = Field(default="redis://localhost:6379/0", alias="REDIS_URL")
     jwt_secret:SecretStr = Field(default="", alias="JWT_SECRET")
 
@@ -249,7 +250,7 @@ class Settings(BaseSettings):
     active_provider: LLMProvider = LLMProvider.GROQ
     llm_providers: dict[str, LLMProviderConfig] = {
         "groq": LLMProviderConfig(
-            model_name="llama-3.3-70b-versatile",
+            model_name="openai/gpt-oss-120b",
             base_url="https://api.groq.com/openai/v1/chat/completions",
         ),
         "anthropic": LLMProviderConfig(
