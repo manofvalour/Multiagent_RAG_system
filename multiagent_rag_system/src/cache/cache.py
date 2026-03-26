@@ -24,7 +24,7 @@ import numpy as np
 
 from ..utils.config_loader import get_settings
 from ..models.models import QueryResponse
-from ..logger.logger import GLOBAL_LOGGER as logger
+from ..logger import GLOBAL_LOGGER as logger
 from ..embedding.embedding import get_embedder
 
 settings = get_settings()
@@ -85,9 +85,8 @@ class SemanticCache:
     Falls back silently to no-op when Redis is unavailable (self._client is None).
     """
 
-    def __init__(self, config=None, redis_url: str = None, embed_model=None) -> None:
+    def __init__(self, config=None) -> None:
         self.config = config or settings.cache #CacheConfig
-        self.embed_model = embed_model or get_embedder()
         self._r = None #set in connect()
 
     #Lifecycle
@@ -112,7 +111,8 @@ class SemanticCache:
         if not r or not self.config.enabled:
             return None
 
-        q_emb = self.embed_model.embed(query)
+        embedder = await get_embedder()
+        q_emb = await embedder.embed([query])
         ids = await r.smembers("cache:index")
 
         best_score, best_id = 0.0, None
@@ -144,7 +144,8 @@ class SemanticCache:
             return
 
         qid = response.request_id
-        emb = self.embed_model.embed(query)
+        embedder = await get_embedder()
+        emb = await embedder.embed([query])
 
         pipe = r.pipeline()
         # Convert numpy array to list for JSON serialization

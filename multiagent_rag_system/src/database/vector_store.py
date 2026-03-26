@@ -19,7 +19,7 @@ from typing import Optional
 
 from ..utils.config_loader import get_settings
 from ..models.models import DocumentChunk, RetrievedChunk
-from ..logger.logger import GLOBAL_LOGGER as logger
+from ..logger import GLOBAL_LOGGER as logger
 
 settings = get_settings()
 
@@ -152,16 +152,16 @@ class VectorStore:
             points=points,
             wait=True,
         )
-        logger.debug(f"Upserted {len(points)} points")
+        logger.info(f"Upserted {len(points)} points")
 
     # Read from QDrant
     async def search(
         self,
-        query_vec:  "np.ndarray",
-        top_k:      int   = 10,
-        threshold:  float = 0.65,
-        ef_search:  int   = 128,
-        filters:    Optional[dict] = None,
+        query_vec: "np.ndarray",
+        top_k: int   = 10,
+        threshold: float = 0.65,
+        ef_search: int   = 128,
+        filters: Optional[dict] = None,
     ) -> list[RetrievedChunk]:
         """
         HNSW approximate nearest-neighbour search.
@@ -191,12 +191,12 @@ class VectorStore:
     def _search_sync(
         self,
         query_vec: list,top_k: int, threshold: float,
-        ef_search: int, filters:   Optional[dict],
+        ef_search: int, filters: Optional[dict],
     ) -> list[RetrievedChunk]:
         
         from qdrant_client.models import Filter, SearchParams
 
-        qdrant_filter = Filter(**filters) if filters else None
+        qdrant_filter = Filter.model_validate(filters) if filters else None
 
         response = self._client.query_points(
             collection_name=self.config.collection_name,

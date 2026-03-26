@@ -5,9 +5,10 @@ from typing import Callable
 
 from ..utils.config_loader import get_settings
 from ..exception.custom_exception import MulitagentragException
-from ..logger.logger import GLOBAL_LOGGER
+from ..logger import GLOBAL_LOGGER
 
 settings = get_settings()
+config = settings.observability
 
 ## setting up prometheus
 try:
@@ -52,7 +53,7 @@ except ImportError:
 def record_query(latency_ms: float, confidence:float, risk:str,
                  cached:bool, n_claims: int, n_supported:int,
                  n_chunks:int):
-    if not PROMETHEUS_AVAILABLE or not settings.enable_metrics:
+    if not PROMETHEUS_AVAILABLE or not config.enable_metrics:
         return
     QUERY_TOTAL.labels(risk_level =risk, cached=str(cached)).inc()
     QUERY_LATENCY.observe(latency_ms)
@@ -62,24 +63,24 @@ def record_query(latency_ms: float, confidence:float, risk:str,
     CHUNKS_RETRIEVED.observe(n_chunks)
 
 def record_ingestion():
-    if not PROMETHEUS_AVAILABLE or not settings.enable_metrics:
+    if not PROMETHEUS_AVAILABLE or not config.enable_metrics:
         return
     
     INGESTION_TOTAL.inc()
 
 def update_store_size(size:int):
-    if not PROMETHEUS_AVAILABLE or not settings.enable_metrics:
+    if not PROMETHEUS_AVAILABLE or not config.enable_metrics:
         return
     VECTOR_STORE_SIZE.set(size)
 
 @asynccontextmanager
 async def track_request():
-    if PROMETHEUS_AVAILABLE and settings.enable_metrics:
+    if PROMETHEUS_AVAILABLE and config.enable_metrics:
         ACTIVE_REQUESTS.inc()
     try:
         yield
     finally:
-        if PROMETHEUS_AVAILABLE and settings.enable_metrics:
+        if PROMETHEUS_AVAILABLE and config.enable_metrics:
             ACTIVE_REQUESTS.dec()
 
 def get_metrics_output()-> bytes:

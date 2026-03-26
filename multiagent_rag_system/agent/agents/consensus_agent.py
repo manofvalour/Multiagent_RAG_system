@@ -1,13 +1,10 @@
 from __future__ import annotations
 import asyncio
-import re
 import time
 from collections import Counter
-from typing import Optional
-import numpy as np
 
 from multiagent_rag_system.src.utils.config_loader import get_settings
-from multiagent_rag_system.src.logger.logger import GLOBAL_LOGGER as logger
+from multiagent_rag_system.src.logger import GLOBAL_LOGGER as logger
 from multiagent_rag_system.src.exception.custom_exception import MulitagentragException
 from multiagent_rag_system.src.models.models import (
     AgentEvent, AgentStatus, RetrievedChunk

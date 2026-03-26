@@ -52,10 +52,10 @@ class CustomLogger:
 
 
 # Global, shared logger instance for the package
-GLOBAL_LOGGER = CustomLogger().get_logger("mulitagent_rag_system")
+#GLOBAL_LOGGER = CustomLogger().get_logger("mulitagent_rag_system")
 
 
-if __name__ == "__main__":
-    logger = GLOBAL_LOGGER
-    logger.info("User upload a file", user_id=123, filename="report.pdf")
-    logger.error("Failed to process PDF", error="File not found", user_id=123)
+#if __name__ == "__main__":
+ #   logger = GLOBAL_LOGGER
+  #  logger.info("User upload a file", user_id=123, filename="report.pdf")
+   # logger.error("Failed to process PDF", error="File not found", user_id=123)

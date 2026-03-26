@@ -12,7 +12,7 @@ import httpx
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
 from ..utils.config_loader import get_settings
-from ..logger.logger import GLOBAL_LOGGER as logger
+from ..logger import GLOBAL_LOGGER as logger
 from ..exception.custom_exception import MulitagentragException
 
 settings = get_settings()
@@ -58,14 +58,14 @@ class LLMLoader(BaseLLMClient):
                 "Content-Type": 'application/json'
             }
 
-        self.model: httpx.AsyncClient  = None
+        self.model: httpx.AsyncClient  = httpx.AsyncClient(timeout=self.llm_config.timeout_seconds)
 
-    async def _client(self):
-        if self.model:
-            return
+    #async def _client(self):
+     #   if self.model:
+      #      return
         
-        self.model = httpx.AsyncClient(timeout=self.llm_config.timeout_seconds)
-        return self.model
+       # self.model = httpx.AsyncClient(timeout=self.llm_config.timeout_seconds)
+        #return self.model
 
 
     @retry(
@@ -80,7 +80,7 @@ class LLMLoader(BaseLLMClient):
 
             t0 =time.perf_counter()
             config = self.llm_config
-            model = self._client()
+            model = self.model
             payload = {
                 "model": config.model_name,
                 "max_tokens": config.max_output_tokens,

@@ -19,7 +19,7 @@ from multiagent_rag_system.agent.agents.doc_ingestion import DocumentIngestionPi
 from multiagent_rag_system.agent.pipeline.pipeline import RAGOrchestrator
 from multiagent_rag_system.src.cache.cache import CacheClient
 from multiagent_rag_system.src.utils.config_loader import get_settings
-from multiagent_rag_system.src.logger.logger import GLOBAL_LOGGER as logger
+from multiagent_rag_system.src.logger import GLOBAL_LOGGER as logger
 from multiagent_rag_system.src.models.models import (
     HealthComponent, HealthResponse, IngestRequest, IngestResponse,
     QueryRequest, QueryResponse, QueryMetrics,

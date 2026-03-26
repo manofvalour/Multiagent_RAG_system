@@ -4,14 +4,11 @@ OpenTelemetry tracing + LangSmith setup + @traced decorator.
 from __future__ import annotations
 
 import functools
-import logging
 import time
 from typing import Any, Callable
 
 from ..utils.config_loader import get_settings
-from ..logger.logger import GLOBAL_LOGGER as logger
-
-logger = logging.getLogger("rag.observability")
+from ..logger import GLOBAL_LOGGER as logger
 
 settings = get_settings()
 

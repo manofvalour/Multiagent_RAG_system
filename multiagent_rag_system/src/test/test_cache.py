@@ -96,7 +96,7 @@ def sem_cfg():
 @pytest.fixture
 def sem_cache(sem_cfg):
     embed = _make_embed_model(_unit_vec())
-    cache = SemanticCache(sem_cfg, "redis://localhost:6379/0", embed)
+    cache = SemanticCache(sem_cfg)# "redis://localhost:6379/0", embed)
 
     mock_r = MagicMock()
     mock_r.smembers  = AsyncMock(return_value=set())
@@ -115,7 +115,7 @@ class TestSemanticCacheGet:
     @pytest.mark.asyncio
     async def test_returns_none_when_disabled(self):
         cfg   = CacheConfig(enabled=False)
-        cache = SemanticCache(cfg, "", _make_embed_model())
+        cache = SemanticCache(cfg)# _make_embed_model())
         cache._client = AsyncMock(return_value=MagicMock())     # should never be touched
         result = await cache.get("any query")
         assert result is None
@@ -123,7 +123,7 @@ class TestSemanticCacheGet:
     @pytest.mark.asyncio
     async def test_returns_none_when_no_client(self):
         cfg   = CacheConfig(enabled=True)
-        cache = SemanticCache(cfg, "", _make_embed_model())
+        cache = SemanticCache(cfg)
         cache._client = AsyncMock(return_value=None)  # Mock to return None (Redis unavailable)
         result = await cache.get("any query")
         assert result is None
@@ -156,10 +156,10 @@ class TestSemanticCacheGet:
         """Orthogonal vector → similarity ≈ 0 → below threshold → miss."""
         # _unit_vec() is [0.5, 0.5, 0.5, 0.5]. Orthogonal vector is [1,-1,0,0]/√2
         orthogonal = np.array([1.0, -1.0, 0.0, 0.0], dtype=np.float32)
-        orthogonal /= np.linalg.norm(orthogonal)
+        orthogonal = np.linalg.norm(orthogonal)
 
         sem_cache._client.return_value.smembers = AsyncMock(return_value={"old-qid"})
-        sem_cache._client.return_value.get      = AsyncMock(return_value=json.dumps(orthogonal.tolist()))
+        sem_cache._client.return_value.get = AsyncMock(return_value=json.dumps(orthogonal.tolist()))
 
         result = await sem_cache.get("completely different query")
         assert result is None
@@ -175,7 +175,7 @@ class TestSemanticCacheSet:
     @pytest.mark.asyncio
     async def test_set_noop_when_disabled(self):
         cfg   = CacheConfig(enabled=False)
-        cache = SemanticCache(config=cfg, embed_model=_make_embed_model())
+        cache = SemanticCache(config=cfg)
         cache._client = AsyncMock(return_value=MagicMock())
         await cache.set("query", _make_response())
         cache._client.return_value.pipeline.assert_not_called()
@@ -183,7 +183,7 @@ class TestSemanticCacheSet:
     @pytest.mark.asyncio
     async def test_set_noop_when_no_client(self):
         cfg   = CacheConfig(enabled=True)
-        cache = SemanticCache(config=cfg, embed_model=_make_embed_model())
+        cache = SemanticCache(config=cfg)
         cache._client = AsyncMock(return_value=None)  # Mock client to return None
         # No exception should be raised
         await cache.set("query", _make_response())
@@ -221,7 +221,7 @@ class TestSemanticCacheRateLimit:
     @pytest.mark.asyncio
     async def test_falls_back_when_no_client(self):
         cfg   = CacheConfig(enabled=True)
-        cache = SemanticCache(config=cfg, embed_model=_make_embed_model())
+        cache = SemanticCache(config=cfg)
         cache._client = AsyncMock(return_value=None)  # Mock _client to return None
         # No client — should return (True, limit) without raising
         allowed, remaining = await cache.check_rate_limit("user-1", limit=60, window=60)

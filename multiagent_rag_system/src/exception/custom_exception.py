@@ -1,7 +1,7 @@
 import traceback
 from typing import Optional, cast
 import sys
-from ..logger.logger import GLOBAL_LOGGER as logger
+from ..logger import GLOBAL_LOGGER as logger
 
 class MulitagentragException(Exception):
     def __init__(self, error_message, error_details: Optional[object]=None):

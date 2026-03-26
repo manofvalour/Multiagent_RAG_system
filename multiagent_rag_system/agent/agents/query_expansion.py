@@ -1,10 +1,9 @@
 """
-/agents/query_expansion.py
 Rewrites the user query into variants that maximise retrieval recall.
 
-HyDE        — generate a hypothetical answer, embed it instead of the question
-Multi-query — rephrase the question N ways to hit different chunks
-Both        — run both concurrently, combine results
+HyDE — generate a hypothetical answer, embed it instead of the question
+Multi_query — rephrase the question N ways to hit different chunks
+Both — run both concurrently, combine results
 """
 from __future__ import annotations
 
@@ -13,7 +12,7 @@ from typing import Optional
 from groq import AsyncGroq
 
 from multiagent_rag_system.src.utils.config_loader import get_settings
-from multiagent_rag_system.src.logger.logger import GLOBAL_LOGGER as logger
+from multiagent_rag_system.src.logger import GLOBAL_LOGGER as logger
 from multiagent_rag_system.src.exception.custom_exception import MulitagentragException
 from multiagent_rag_system.src.models.models import QueryRequest
 settings = get_settings()
@@ -25,7 +24,7 @@ class QueryExpansionAgent:
         self._groqai: Optional[AsyncGroq] = None
         self.api_key = settings.groq_api_key.get_secret_value()
         self.config = settings.query_expansion
-        self.model_config = settings.llm_providers[settings.active_llm]
+        self.model_config = settings.llm_providers[settings.active_provider]
 
     def _client(self) -> AsyncGroq:
         if self._groqai is None:
@@ -38,24 +37,29 @@ class QueryExpansionAgent:
           expanded_queries — list of strings for the retriever
           hyde_doc — hypothetical answer text (or None)
         """
-        if not self.config.enabled:
-            return [query.query], None
+        try:
+            if not self.config.enabled:
+                return [query.query], None
 
-        if self.config.strategy == "hyde":
-            hyde_doc = await self._hyde(query.query)
-            return [query.query, hyde_doc], hyde_doc
+            if self.config.strategy == "hyde":
+                hyde_doc = await self._hyde(query.query)
+                return [query.query, hyde_doc], hyde_doc
 
-        elif self.config.strategy == "multi_query":
-            variants = await self._multi_query(query.query)
-            return [query.query] + variants, None
+            elif self.config.strategy == "multi_query":
+                variants = await self._multi_query(query.query)
+                return [query.query] + variants, None
 
-        else:   # both
-            hyde_doc, variants = await asyncio.gather(
-                self._hyde(query.query),
-                self._multi_query(query.query),
-            )
-            return [query.query, hyde_doc] + variants, hyde_doc
-
+            else:   # both
+                hyde_doc, variants = await asyncio.gather(
+                    self._hyde(query.query),
+                    self._multi_query(query.query),
+                )
+                return [query.query, hyde_doc] + variants, hyde_doc
+            
+        except Exception as e:
+            logger.error("Failed to load the expansion model", error = str(e))
+            raise MulitagentragException("failed to load teh expansion model", error_details = str(e))
+        
     async def _hyde(self, query: str) -> str:
         """
         Generate a hypothetical ideal-answer paragraph.

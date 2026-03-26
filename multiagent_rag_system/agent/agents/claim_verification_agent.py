@@ -3,9 +3,10 @@ import asyncio
 import re
 import time
 from typing import Optional
+import sys
 
 from multiagent_rag_system.src.utils.config_loader import get_settings
-from multiagent_rag_system.src.logger.logger import GLOBAL_LOGGER as logger
+from multiagent_rag_system.src.logger import GLOBAL_LOGGER as logger
 from multiagent_rag_system.src.exception.custom_exception import MulitagentragException
 from multiagent_rag_system.src.models.models import (
     AgentEvent, AgentStatus, Claim, RerankedChunk, RetrievedChunk)
@@ -66,38 +67,43 @@ class ClaimVerificationAgent:
     async def run(
             self, answer: str, chunks: list[RerankedChunk]
     ) -> tuple[list[Claim], AgentEvent]:
-        t0 = time.perf_counter()
-        sentences = self._split_claims(answer)
+        try:
+            t0 = time.perf_counter()
+            sentences = self._split_claims(answer)
 
-        if not sentences:
-            return [], _timed_event(agent=self.NAME, status=AgentStatus.DONE, message="No claims extracted", start=t0)
-        
-        ## verify all claims concurrently
-        verify_tasks = [
-            self._verify_one_llm(s, chunks) if self.use_llm
-            else self._lexical_async(s, chunks)
-            for s in sentences
-        ]
-        results = await asyncio.gather(*verify_tasks, return_exceptions=True)
+            if not sentences:
+                return [], _timed_event(agent=self.NAME, status=AgentStatus.DONE, message="No claims extracted", start=t0)
+            
+            ## verify all claims concurrently
+            verify_tasks = [
+                self._verify_one_llm(s, chunks) if self.use_llm
+                else self._lexical_async(s, chunks)
+                for s in sentences
+            ]
+            results = await asyncio.gather(*verify_tasks, return_exceptions=True)
 
-        claims: list[Claim] = []
-        for sentence, result in zip(sentences, results):
-            if isinstance(result, Exception):
-                supported, confidence = self._verify_lexical(sentence,chunks)
-            else:
-                supported, confidence = result
-            supporting = [rc for rc in chunks if _overlap_ratio(sentence, rc.chunk.content)> 0.15]
-            claims.append(Claim(
-                text=sentence, supported = supported,
-                confidence=round(confidence, 3), supporting_chunks = supporting[:2],
-            ))
+            claims: list[Claim] = []
+            for sentence, result in zip(sentences, results):
+                if isinstance(result, Exception):
+                    supported, confidence = self._verify_lexical(sentence,chunks)
+                else:
+                    supported, confidence = result
+                supporting = [rc for rc in chunks if _overlap_ratio(sentence, rc.chunk.content)> 0.15]
+                claims.append(Claim(
+                    text=sentence, supported = supported,
+                    confidence=round(confidence, 3), supporting_chunks = supporting[:2],
+                ))
+            
+            n_supported = sum(1 for c in claims if c.supported)
+            event = _timed_event(
+                agent=self.NAME, status=AgentStatus.DONE,
+                message=f"{n_supported}/{len(claims)} claims supported",
+                start=t0, total=len(claims), supported = n_supported,
+                unsupported=len(claims) - n_supported,
+            )
+            logger.info("Claim_verification", **event.metadata)
+            return claims, event
         
-        n_supported = sum(1 for c in claims if c.supported)
-        event = _timed_event(
-            agent=self.NAME, status=AgentStatus.DONE,
-            message=f"{n_supported}/{len(claims)} claims supported",
-            start=t0, total=len(claims), supported = n_supported,
-            unsupported=len(claims) - n_supported,
-        )
-        logger.info("Claim_verification", **event.metadata)
-        return claims, event
+        except Exception as e:
+            logger.error("Failed to load Clain verification agent")
+            raise MulitagentragException(e,sys)

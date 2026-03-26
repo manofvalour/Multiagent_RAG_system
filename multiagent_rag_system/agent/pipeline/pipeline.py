@@ -19,7 +19,7 @@ from typing import AsyncIterator, Optional
 from multiagent_rag_system.src.observability.observability import traced
 
 from multiagent_rag_system.src.utils.config_loader import get_settings
-from multiagent_rag_system.src.logger.logger import GLOBAL_LOGGER as logger
+from multiagent_rag_system.src.logger import GLOBAL_LOGGER as logger
 from multiagent_rag_system.src.exception.custom_exception import MulitagentragException
 from multiagent_rag_system.src.models.models import (
     AgentEvent, QueryRequest, QueryResponse, 
@@ -34,15 +34,15 @@ from ..agents.consensus_agent import ConsensusAgent
 from ..agents.claim_verification_agent import ClaimVerificationAgent
 from ..agents.reranker_agent import RerankerAgent
 from ..agents.retrieval_agent import ChunkRetrieval
-
+from ...src.embedding.embedding import EmbeddingProvider
 
 settings = get_settings()
 
 
 class RAGOrchestrator:
     def __init__(
-        self, expansion=QueryExpansionAgent, retriever= ChunkRetrieval(), 
-        reranker=RerankerAgent, consensus=ConsensusAgent, cache=SemanticCache(), 
+        self, expansion=QueryExpansionAgent(), retriever= ChunkRetrieval(), 
+        reranker=RerankerAgent(), consensus=ConsensusAgent, cache=SemanticCache(), 
         evaluator= RAGASEvaluator(), confidence_score= ConfidenceScoringAgent,
         claim_verification= ClaimVerificationAgent()
     ) -> None:
