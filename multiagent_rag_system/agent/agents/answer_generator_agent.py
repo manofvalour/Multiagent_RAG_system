@@ -8,7 +8,7 @@ from ...src.utils.config_loader import get_settings
 from ...src.logger import GLOBAL_LOGGER as logger
 from ...src.exception.custom_exception import MulitagentragException
 from ...src.models.models import (
-    AgentEvent, AgentStatus, RetrievedChunk)
+    AgentEvent, AgentStatus, RerankedChunk)
 from ...src.utils.general_utils import _timed_event
 from ...src.llm.llms import BaseLLMClient, LLMResponse, get_llm_client
 
@@ -38,10 +38,9 @@ class AnswerGeneratorAgent:
         self.llm = llm or get_llm_client()
         self.agent_id = agent_id
         self.agent_name = f"{self.NAME}-{agent_id}"
-        self.config = settings.reranker
 
     async def run(self,
-            query:str, chunks:list[RetrievedChunk], 
+            query:str, chunks:list[RerankedChunk], 
             temperature: Optional[float]=None,
             )-> tuple[str, AgentEvent]:
         
@@ -54,16 +53,19 @@ class AnswerGeneratorAgent:
                                          start=t0,)
             
             context_parts =[]
-            for i, rc in enumerate(chunks[: self.config.top_n]):
+            for i, rc in enumerate(chunks,1):
                 context_parts.append(
-                f"[{i}] Source:{rc.chunk.source}/n{rc.chunk.content.strip()}")
+                f"[{i}] {rc.chunk.content.strip()}")
+
+            context_str = "\n".join(context_parts)
+            user_content = f"Context:\n{context_str}\n\nQuestion: {query}"
 
             # Vary the temperature per agent for ensemble when a base temperature is provided.
             # If no temperature is provided, let the LLM client use its default.
             temp = (temperature + self.agent_id * 0.05) if temperature is not None else None
 
             resp: LLMResponse = await self.llm.complete(
-                system=self.SYSTEM_PROMPT, user = query, 
+                system=self.SYSTEM_PROMPT, user = user_content, 
                 temperature=temp,
             )
             msg = f"Generated answer ({resp.output_tokens} tokens)"

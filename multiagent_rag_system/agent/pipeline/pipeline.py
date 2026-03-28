@@ -178,11 +178,10 @@ class RAGOrchestrator:
 
         # Post-stream: cache + evaluate
         answer  = "".join(full_tokens)
-        sources = list(dict.fromkeys(c.chunk.source for c in reranked))
+      #  sources = list(dict.fromkeys(c.chunk.source for c in reranked))
         response = QueryResponse(
             query_id=query.id,
             answer=answer,
-            sources=sources,
             retrieved_chunks=retrieved,
             reranked_chunks=reranked,
             expanded_queries=expanded_queries,

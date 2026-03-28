@@ -86,11 +86,6 @@ class LLMProviderConfig(BaseModel):
     max_output_tokens: int   = Field(default=2048, ge=1)
     timeout_seconds:   int   = Field(default=30,   ge=1)
     stream:            bool  = True
-    system_prompt:     str   = (
-        "You are a precise, helpful assistant. "
-        "Answer using ONLY the provided context. "
-        "If the context does not contain the answer, say so clearly."
-    )
 
     @field_validator("temperature")
     @classmethod
@@ -288,16 +283,16 @@ class Settings(BaseSettings):
     def is_production(self) -> bool:
         return self.environment == Environment.PRODUCTION
 
-    @property
-    def active_api_key(self) -> str:
-        """Return the raw API key string for the active LLM provider."""
-        mapping = {
-            LLMProvider.GROQ:      self.groq_api_key,
-            LLMProvider.ANTHROPIC: self.anthropic_api_key,
-            LLMProvider.OPENAI:    self.openai_api_key,
-        }
-        secret = mapping[self.active_provider]
-        return secret.get_secret_value() if secret else ""
+   # @property
+    #def active_api_key(self) -> str:
+     #   """Return the raw API key string for the active LLM provider."""
+      #  mapping = {
+       #     LLMProvider.GROQ:      self.groq_api_key,
+        #    LLMProvider.ANTHROPIC: self.anthropic_api_key,
+         #   LLMProvider.OPENAI:    self.openai_api_key,
+       # }
+       # secret = mapping[self.active_provider]
+        #return secret.get_secret_value() if secret else ""
 
     #Constructors
     @classmethod

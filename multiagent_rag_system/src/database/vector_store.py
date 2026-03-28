@@ -5,7 +5,7 @@ Two connection modes (auto-detected from config):
 
 Why Qdrant over FAISS?
   - Full CRUD: delete individual points without rebuilding the entire index
-  - Native payload filtering: filter by source, doc_id, content_type at search time
+  - Native payload filtering: filter by sourc, doc_id, content_type at search time
   - Built-in persistence: no manual save/load pickle files
   - Qdrant Cloud: one env-var switch from local to managed cloud
   - REST + gRPC API: queryable from any language / external tool
@@ -130,7 +130,6 @@ class VectorStore:
             payload = {
                 "id":           chunk.id,
                 "content":      chunk.content,
-                "source":       chunk.source,
                 "chunk_index":  chunk.chunk_index,
                # "content_type": chunk.content_type.value,
                 #"page_number":  chunk.page_number,
@@ -171,7 +170,7 @@ class VectorStore:
                      lower   -> faster, less accurate  (32-64 for latency-sensitive paths)
 
         filters    — Qdrant payload filter dict, e.g.
-                     {"must": [{"key": "source", "match": {"value": "report.pdf"}}]}
+                     {"must": [{"key": "sourc", "match": {"value": "report.pdf"}}]}
                      Passed to Qdrant's Filter(**filters) constructor.
         """
         if self._client is None:
@@ -195,8 +194,23 @@ class VectorStore:
     ) -> list[RetrievedChunk]:
         
         from qdrant_client.models import Filter, SearchParams
+        logger.info(f"Raw Filters recieved: {filters}")
 
-        qdrant_filter = Filter.model_validate(filters) if filters else None
+        qdrant_filter = None
+        if filters:
+            allowed_keys = {"must", "should", "must_not", "min_should"}
+            sanitized_filters = {
+                k: v for k, v in filters.items() 
+                if k in allowed_keys and v is not None
+            }
+
+            if sanitized_filters:
+                try:
+                    qdrant_filter = Filter.model_validate(sanitized_filters)
+                except Exception as e:
+                    logger.warning(f"Filter validation failed: {e}. Proceeding without filters.")
+                    qdrant_filter = None
+           # qdrant_filter = Filter.model_validate(filters) if filters else None
 
         response = self._client.query_points(
             collection_name=self.config.collection_name,
@@ -233,7 +247,6 @@ class VectorStore:
         chunk = DocumentChunk(
             id=           p["id"],
             content=      p["content"],
-            source=       p["source"],
             chunk_index=  p.get("chunk_index", 0),
             content_type= ContentType(p.get("content_type", "prose")),
             page_number=  p.get("page_number"),

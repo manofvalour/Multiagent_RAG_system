@@ -37,7 +37,7 @@ class ChunkRetrieval:
 
     async def retrieve(
         self, queries:  list[str],
-        filters:  Optional[dict] = None,
+        filters:  Optional[dict] = None
     ) -> tuple[list[RetrievedChunk], AgentEvent]:
         """
         queries  -- one or more strings (original + HyDE / multi-query variants)
@@ -78,7 +78,7 @@ class ChunkRetrieval:
 
             merged = sorted(best.values(), key=lambda x: x.vector_score, reverse=True)
             event = _timed_event(agent=self.NAME, status=AgentStatus.DONE,
-                                    message=f"{len(queries)} Unique Chunks {len(merged)})",
+                                    message=f"Number of Queries: {len(queries)} | Unique Chunks Retrieved: {len(merged)}",
                                     start=t0, kept=len(merged))
                 
             logger.info(f"[Retriever] queries={len(queries)}  unique_chunks={len(merged)}")

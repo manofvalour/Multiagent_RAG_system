@@ -28,7 +28,6 @@ class ContentType(str, Enum):
 
 class IngestRequest(BaseModel):
     content:str = Field(..., min_length =10, description ="Raw document text")
-    source: str = Field(..., description= "Human-readable source label")
     metadata: dict[str, Any] = Field(default_factory=dict)
     chunk_size: int = Field(default=512, ge=64, le=4096)
     chunk_overlap: int = Field(default=64, ge=0, le=512)
@@ -37,7 +36,6 @@ class IngestResponse(BaseModel):
     document_id: str
     chunks_created: int
     processing_ms: float
-    source: str
     content_type: str
 
 
@@ -47,7 +45,7 @@ class DocumentChunk(BaseModel):
     id:str = Field(default_factory=lambda:str(uuid.uuid4()))
     doc_id:str
     content: str
-    source: str
+    #source: str
     metadata: dict[str, Any] = Field(default_factory=dict)
     chunk_index: int=0
     embedding: Optional[list[float]]=None
@@ -62,7 +60,7 @@ class RetrievedChunk(BaseModel):
 class RerankedChunk(BaseModel):
     chunk: DocumentChunk
     similarity_score: float=Field(ge=0.0, le=1.0)
-    reranker_score: float = Field(ge=0.0, le=1.0, default=0.0)
+    reranker_score: float = Field(default=0.0)
 
 ## setting up again trace
 class AgentEvent(BaseModel):

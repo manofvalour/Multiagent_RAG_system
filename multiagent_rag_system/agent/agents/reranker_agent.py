@@ -22,6 +22,7 @@ class RerankerAgent:
     def __init__(self) -> None:
         self._model = None
         self.config = settings.reranker
+       # self.threshold = self.config.threshold
  
     def _load(self) -> None:
         if self._model is None:
@@ -35,7 +36,7 @@ class RerankerAgent:
         try:
             t0 = time.perf_counter()
 
-            if not self.config.enabled or not chunks:
+            if not self.config.enabled:
                 reranked = [RerankedChunk(
                         chunk=c.chunk,
                         similarity_score=c.vector_score,
@@ -43,9 +44,16 @@ class RerankerAgent:
                     for c in chunks]
                 
                 event = _timed_event(agent=self.NAME, status=AgentStatus.DONE,
-                                message="No chunk to rerank",
+                                message="Reranker Turned off",
                                 start=t0)
                 
+                return reranked, event
+            
+            elif not chunks:
+                reranked = []
+                event = _timed_event(agent=self.NAME, status = AgentStatus.DONE,
+                                     message = "No Chunk to rerank",
+                                     start = t0)
                 return reranked, event
     
             loop = asyncio.get_event_loop()
@@ -72,8 +80,7 @@ class RerankerAgent:
     
             event = _timed_event(agent=self.NAME, status=AgentStatus.DONE,
                                 message=f"Validated {len(reranked)}/{len(chunks)} chunks (dropped: {dropped})",
-                                start=t0, kept=len(reranked), dropped=dropped,
-                                threshold=self.threshold)
+                                start=t0, chunks_kept=len(reranked), chunks_dropped=dropped)
             logger.info(
                 f"[Reranker] in={len(chunks)}  out={len(reranked)}  "
                 f"top_score={reranked[0].reranker_score:.3f}"
@@ -83,4 +90,4 @@ class RerankerAgent:
         
         except Exception as e:
             logger.error("Failed to Rerank the retrieved chunks")
-            MulitagentragException(e,sys)
+            MulitagentragException("Failed to rerank the retrieved chunk", error_details=str(e))

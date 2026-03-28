@@ -196,11 +196,11 @@ class SemanticChunker:
         self.threshold   = threshold
         self.buffer_size = buffer_size
 
-    def split(self, text: str, content_type: ContentType) -> list[str]:
+    async def split(self, text: str, content_type: ContentType) -> list[str]:
         sentences = self._to_sentences(text, content_type)
         if len(sentences) <= 2:
             return [text]
-        embeddings   = self._embed_buffered(sentences)
+        embeddings   = await self._embed_buffered(sentences)
         split_points = self._find_splits(embeddings)
         return self._merge(sentences, split_points)
 
@@ -211,13 +211,16 @@ class SemanticChunker:
             raw = re.split(r"\n{2,}", text)
         return [s.strip() for s in raw if s.strip()]
 
-    def _embed_buffered(self, sentences: list[str]) -> np.ndarray:
+    async def _embed_buffered(self, sentences: list[str]) -> np.ndarray:
         buffered = [
             " ".join(sentences[max(0, i - self.buffer_size): i + self.buffer_size + 1])
             for i in range(len(sentences))
         ]
-        return get_embedder.embed(
-            buffered).astype(np.float32)
+        embedder = await get_embedder()
+        raw_embedding = await embedder.embed(buffered)
+        embedding:np.ndarray = np.array(raw_embedding).astype(np.float32)
+
+        return embedding
 
     def _find_splits(self, embeddings: np.ndarray) -> list[int]:
         splits, seg_start = [], 0
@@ -292,15 +295,15 @@ class HybridChunker:
             logger.error("Failed to recursively split the document", error = str(e))
             raise MulitagentragException("Failed to Recursively split the document",str(e))
         
-    def chunk(
-        self, text: str, source: str,
+    async def chunk(
+        self, text: str,
         content_type: ContentType,
         metadata: dict,
     ) -> list[DocumentChunk]:
         try:
 
             splitter = self._get_splitter(content_type)
-            segments = self.semantic.split(text, content_type)
+            segments = await self.semantic.split(text, content_type)
             final: list[str] = []
             for seg in segments:
                 if self._len_fn(seg) <= self.config.chunk_size:
@@ -312,7 +315,6 @@ class HybridChunker:
             return [
                 DocumentChunk(
                     content=seg,
-                    source=source,
                     chunk_index=i,
                     doc_id=metadata.get("doc_id", ""),
                     metadata={k: v for k, v in metadata.items() if k != "doc_id"},
@@ -323,7 +325,7 @@ class HybridChunker:
 
         except Exception as e:
             logger.error("Hybrid chunker failed", error = str(e))
-            raise MulitagentragException("Hybrid chunker failed", error_detailes= str(e))
+            raise MulitagentragException("Hybrid chunker failed", error_details= str(e))
         
 #Ingestion pipeline
 class DocumentIngestionPipeline:
@@ -373,7 +375,8 @@ class DocumentIngestionPipeline:
         try:
             t0 = time.perf_counter()
             ct = detect_content_type(req.content)
-            return await self._process(req.content, req.source, ct, req.metadata, t0)
+            await self._process(req.content, ct, req.metadata, t0)
+            logger.info("Document succesfully ingested to the vector database")
 
         except Exception as e:
             logger.error("Failed to parse the text file", error = str(e))
@@ -431,17 +434,18 @@ class DocumentIngestionPipeline:
             )
         
     async def _process(
-        self, text: str, source: str,
+        self, text: str,
         ct: ContentType, metadata: dict, t0: float,
     ) -> IngestResponse:
+        
         doc_id = str(uuid.uuid4())
-        chunks = self.chunker.chunk(text, source, ct, {**metadata, "doc_id": doc_id})
+        chunks = await self.chunker.chunk(text, ct, {**metadata, "doc_id": doc_id})
 
         if not chunks:
-            logger.info(f"No chunks produced for {source!r}")
+            logger.info(f"No chunks produced for data")
             latency = round((time.perf_counter() - t0) * 1000, 2)
             return IngestResponse(
-                document_id=doc_id, source=source, chunks_created=0,
+                document_id=doc_id, chunks_created=0,
                 content_type=ct.value, processing_ms=latency,
             )
 
@@ -455,11 +459,10 @@ class DocumentIngestionPipeline:
         vector_store = await get_vector_store()
         await vector_store.add_chunks(chunks, embeddings)
         latency = round((time.perf_counter() - t0) * 1000, 2)
-        logger.info(f"Ingested {source!r}  chunks={len(chunks)}  type={ct.value}  {latency}ms")
+        logger.info(f"Document Ingested: chunks={len(chunks)}  type={ct.value}  {latency}ms")
 
         return IngestResponse(
             document_id=doc_id,
-            source=source,
             chunks_created=len(chunks),
             content_type=ct.value,
             processing_ms=latency,

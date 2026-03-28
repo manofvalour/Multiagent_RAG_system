@@ -23,11 +23,11 @@ class CustomLogger:
         file_handler.setFormatter(logging.Formatter("%(message)s"))
 
         console_handler = logging.StreamHandler()
-        console_handler.setLevel(logging.INFO)
+        console_handler.setLevel(logging.WARNING)
         console_handler.setFormatter(logging.Formatter("%(message)s"))
 
         logging.basicConfig(
-            level=logging.INFO,
+            level=logging.WARNING,
             format="%(message)s",
             handlers=[file_handler, console_handler],
         )

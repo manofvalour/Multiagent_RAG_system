@@ -7,7 +7,7 @@ from multiagent_rag_system.src.utils.config_loader import get_settings
 from multiagent_rag_system.src.logger import GLOBAL_LOGGER as logger
 from multiagent_rag_system.src.exception.custom_exception import MulitagentragException
 from multiagent_rag_system.src.models.models import (
-    AgentEvent, AgentStatus, RetrievedChunk
+    AgentEvent, AgentStatus, RerankedChunk
     )
 from multiagent_rag_system.agent.agents.answer_generator_agent import AnswerGeneratorAgent
 from multiagent_rag_system.src.utils.general_utils import _timed_event, _word_text
@@ -25,13 +25,14 @@ class ConsensusAgent:
         self.generators = [AnswerGeneratorAgent(agent_id=i) for i in range(n)]
 
     async def run(self,
-                query:str, chunks: list[RetrievedChunk]
+                query:str, chunks: list[RerankedChunk]
               )-> tuple[str, list[str], AgentEvent]:
         try:
+            config = settings.active_llm
             t0 = time.perf_counter()
 
             results = await asyncio.gather(
-                *[g.run(query,chunks) for g in self.generators], 
+                *[g.run(query,chunks, self.config) for g in self.generators], 
                 return_exceptions=True,
             )
             answers = [r[0] for r in results if isinstance(r, tuple)]

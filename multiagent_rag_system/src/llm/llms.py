@@ -45,12 +45,9 @@ class BaseLLMClient(ABC):
 
 #Anthropic
 class AnthropicClient(BaseLLMClient):
-    BASE_URL = "https://api.anthropic.com/v1/messages"
-
     def __init__(self):
         key = settings.anthropic_api_key.get_secret_value()
-        self.llm_config = settings.llm_providers[settings.active_provider]
-        self.base_url = self.llm_config.base_url
+        self.llm_config = settings.llm_providers['anthropic']
         self._headers = {
             "x-api-key": key,
             "anthropic-version": "2023-06-01",
@@ -74,7 +71,7 @@ class AnthropicClient(BaseLLMClient):
                 "system": system,
                 "messages": [{"role": "user", "content": user}],
             }
-            resp = await self._client.post(self.BASE_URL, headers=self._headers, json=payload)
+            resp = await self._client.post(self.llm_config.base_url, headers=self._headers, json=payload)
             resp.raise_for_status()
             data = resp.json()
             text = data["content"][0]["text"]
@@ -104,12 +101,9 @@ class AnthropicClient(BaseLLMClient):
 
 #GroqAPI
 class GroqClient(BaseLLMClient):
-    BASE_URL = "https://api.openai.com/v1/chat/completions"
-
     def __init__(self):
         key = settings.groq_api_key.get_secret_value()
-        self.llm_config = settings.llm_providers[settings.active_provider]
-        self.base_url = self.llm_config.base_url
+        self.llm_config = settings.llm_providers['groq']
         self._headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
         self._client = httpx.AsyncClient(timeout=self.llm_config.timeout_seconds)
 
@@ -118,7 +112,7 @@ class GroqClient(BaseLLMClient):
                                  min=1, max=10), 
                                  reraise=True)
     
-    async def complete(self, system: str, user: str, 
+    async def complete(self, system: str, user: str,
                        temperature: Optional[float] = None) -> LLMResponse:
         try:
             t0 = time.perf_counter()
@@ -129,7 +123,7 @@ class GroqClient(BaseLLMClient):
                 "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
             }
 
-            resp = await self._client.post(self.BASE_URL, headers=self._headers, json=payload)
+            resp = await self._client.post(self.llm_config.base_url, headers=self._headers, json=payload)
             resp.raise_for_status()
             data = resp.json()
             text = data["choices"][0]["message"]["content"]
