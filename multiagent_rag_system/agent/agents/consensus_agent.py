@@ -28,14 +28,15 @@ class ConsensusAgent:
                 query:str, chunks: list[RerankedChunk]
               )-> tuple[str, list[str], AgentEvent]:
         try:
-            config = settings.active_llm
             t0 = time.perf_counter()
 
             results = await asyncio.gather(
-                *[g.run(query,chunks, self.config) for g in self.generators], 
+                *[g.run(query,chunks) for g in self.generators], 
                 return_exceptions=True,
             )
             answers = [r[0] for r in results if isinstance(r, tuple)]
+
+            logger.info("Consensus candidates generated", n_candidates=len(answers), latency_ms= (time.perf_counter()- t0)*1000)
 
             if not answers:
                 return "Unable to generate consensus answer.", [], \

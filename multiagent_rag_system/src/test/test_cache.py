@@ -137,16 +137,23 @@ class TestSemanticCacheGet:
     @pytest.mark.asyncio
     async def test_returns_cached_response_on_high_similarity(self, sem_cache):
         """Same embedding vector should score 1.0 similarity → cache hit."""
-        stored_emb  = _unit_vec().tolist()
-        response    = _make_response()
+        vec = _unit_vec(dim=384)  # Use 384D to match real embedder
+        stored_emb = vec.tolist()
+        response = _make_response()
 
         sem_cache._client.return_value.smembers = AsyncMock(return_value={"test-qid"})
-        sem_cache._client.return_value.get      = AsyncMock(side_effect=[
+        sem_cache._client.return_value.get = AsyncMock(side_effect=[
             json.dumps(stored_emb),         # first call: embedding
             response.model_dump_json(),     # second call: response body
         ])
 
-        result = await sem_cache.get("What is RAG?")
+        # Mock get_embedder to return compatible 384D embeddings
+        mock_embedder = MagicMock()
+        mock_embedder.embed = AsyncMock(return_value=np.array([vec]))
+        
+        with patch("multiagent_rag_system.src.cache.cache.get_embedder", return_value=mock_embedder):
+            result = await sem_cache.get("What is RAG?")
+        
         assert result is not None
         assert result.cached is True
         assert result.answer == "Test answer"
@@ -154,14 +161,24 @@ class TestSemanticCacheGet:
     @pytest.mark.asyncio
     async def test_returns_none_on_low_similarity(self, sem_cache):
         """Orthogonal vector → similarity ≈ 0 → below threshold → miss."""
-        # _unit_vec() is [0.5, 0.5, 0.5, 0.5]. Orthogonal vector is [1,-1,0,0]/√2
-        orthogonal = np.array([1.0, -1.0, 0.0, 0.0], dtype=np.float32)
-        orthogonal = np.linalg.norm(orthogonal)
+        # Create a unit vector in 384D
+        unit_vec = _unit_vec(dim=384)
+        # Create an orthogonal 384D vector by zeroing all but rotating some components
+        orthogonal = np.zeros(384, dtype=np.float32)
+        orthogonal[0] = 1.0
+        orthogonal[1] = -1.0
+        orthogonal = orthogonal / np.linalg.norm(orthogonal)
 
         sem_cache._client.return_value.smembers = AsyncMock(return_value={"old-qid"})
         sem_cache._client.return_value.get = AsyncMock(return_value=json.dumps(orthogonal.tolist()))
 
-        result = await sem_cache.get("completely different query")
+        # Mock get_embedder to return the unit vector
+        mock_embedder = MagicMock()
+        mock_embedder.embed = AsyncMock(return_value=np.array([unit_vec]))
+        
+        with patch("multiagent_rag_system.src.cache.cache.get_embedder", return_value=mock_embedder):
+            result = await sem_cache.get("completely different query")
+        
         assert result is None
 
 

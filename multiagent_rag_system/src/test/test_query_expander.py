@@ -68,7 +68,7 @@ class TestQueryExpansionAgent:
     """
 
     def _make_agent(self, strategy: str = "hyde", enabled: bool = True):
-        from multiagent_rag_system.agent.query_expansion import QueryExpansionAgent
+        from multiagent_rag_system.agent.agents.query_expansion import QueryExpansionAgent
 
         agent = QueryExpansionAgent.__new__(QueryExpansionAgent)
         agent.api_key  = "test-key"

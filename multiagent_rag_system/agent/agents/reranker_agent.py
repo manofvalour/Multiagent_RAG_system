@@ -9,7 +9,7 @@ from multiagent_rag_system.src.logger import GLOBAL_LOGGER as logger
 from multiagent_rag_system.src.exception.custom_exception import MulitagentragException
 from multiagent_rag_system.src.models.models import (
     AgentEvent, AgentStatus,
-    RetrievedChunk, RerankedChunk
+    RetrievedChunk, RerankedChunk, QueryRequest
     )
 from multiagent_rag_system.src.utils.general_utils import _timed_event
 
@@ -22,7 +22,6 @@ class RerankerAgent:
     def __init__(self) -> None:
         self._model = None
         self.config = settings.reranker
-       # self.threshold = self.config.threshold
  
     def _load(self) -> None:
         if self._model is None:
@@ -43,6 +42,7 @@ class RerankerAgent:
                     )
                     for c in chunks]
                 
+                logger.info("Reranker is disabled, skipping reranking step.")
                 event = _timed_event(agent=self.NAME, status=AgentStatus.DONE,
                                 message="Reranker Turned off",
                                 start=t0)
@@ -51,13 +51,15 @@ class RerankerAgent:
             
             elif not chunks:
                 reranked = []
+
+                logger.info("No chunks to rerank, skipping reranking step.")
                 event = _timed_event(agent=self.NAME, status = AgentStatus.DONE,
                                      message = "No Chunk to rerank",
                                      start = t0)
                 return reranked, event
     
             loop = asyncio.get_event_loop()
-    
+            print("Running cross-encoder in executor...")
             def _run_cross_encoder():
                 self._load()
                 pairs  = [(query, c.chunk.content) for c in chunks]
@@ -65,6 +67,7 @@ class RerankerAgent:
                 return scores
     
             rerank_scores = await loop.run_in_executor(None, _run_cross_encoder)
+            logger.info(f"Rerank scores generated")
     
             reranked = [
                 RerankedChunk(
@@ -74,10 +77,12 @@ class RerankerAgent:
                 )
                 for c, s in zip(chunks, rerank_scores)
             ]
+            logger.info(f"Reranker scores computed for {len(chunks)} chunks")
             reranked.sort(key=lambda x: x.reranker_score, reverse=True)
             reranked = reranked[: self.config.top_n]
             dropped = len(chunks) - len(reranked)
-    
+
+            logger.info(f"Reranked {len(chunks)} chunks in {time.perf_counter() - t0:.2f}s, kept {len(reranked)}, dropped {dropped}")
             event = _timed_event(agent=self.NAME, status=AgentStatus.DONE,
                                 message=f"Validated {len(reranked)}/{len(chunks)} chunks (dropped: {dropped})",
                                 start=t0, chunks_kept=len(reranked), chunks_dropped=dropped)
@@ -90,4 +95,4 @@ class RerankerAgent:
         
         except Exception as e:
             logger.error("Failed to Rerank the retrieved chunks")
-            MulitagentragException("Failed to rerank the retrieved chunk", error_details=str(e))
+            raise MulitagentragException("Failed to rerank the retrieved chunk", error_details=str(e))

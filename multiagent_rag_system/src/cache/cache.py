@@ -112,7 +112,7 @@ class SemanticCache:
             return None
 
         embedder = await get_embedder()
-        q_emb = await embedder.embed([query])
+        q_emb = (await embedder.embed([query]))[0] # get the single embedding vector
         ids = await r.smembers("cache:index")
 
         best_score, best_id = 0.0, None
@@ -121,6 +121,8 @@ class SemanticCache:
             if not raw:
                 continue
             cached_emb = np.array(json.loads(raw), dtype=np.float32)
+            # Flatten to handle both (384,) and (1, 384) shapes
+            cached_emb = cached_emb.flatten()
 
             # np.dot on two L2-normalised vectors equals cosine similarity
             score = float(np.dot(q_emb, cached_emb))

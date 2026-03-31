@@ -75,7 +75,7 @@ class TestConfidenceScoringAgent:
     """
 
     def _make_agent(self):
-        from multiagent_rag_system.agent.confidence_score_agent import ConfidenceScoringAgent
+        from multiagent_rag_system.agent.agents.confidence_score_agent import ConfidenceScoringAgent
         agent = ConfidenceScoringAgent()
         agent.config = MagicMock()
         agent.config.confidence_low_threshold    = 0.65

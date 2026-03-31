@@ -1,5 +1,5 @@
 """
-core/llm.py — Async LLM client abstraction
+src/llm/llms.py — Async LLM client abstraction
 Supports Anthropic, OpenAI, and Ollama.
 Implements: retry with exponential backoff, token counting, streaming stubs.
 """

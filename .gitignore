@@ -12,3 +12,6 @@ logs/
 .env
 *.ipynb
 data/
+*.cpp
+cpp_trial/
+my_program

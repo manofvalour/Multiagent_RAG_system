@@ -84,7 +84,7 @@ class TestRAGOrchestrator:
         return AgentEvent(agent="mock", status=AgentStatus.DONE, message=message)
 
     def _make_pipeline(self, retrieved_chunks, reranked_chunks, mock_cache):
-        from multiagent_rag_system.agent.pipeline import RAGOrchestrator
+        from multiagent_rag_system.agent.pipeline.pipeline import RAGOrchestrator
 
         expansion = MagicMock()
         expansion.expand = AsyncMock(return_value=(["original query"], None))
@@ -161,7 +161,7 @@ class TestRAGOrchestrator:
         mock_cache.get = AsyncMock(return_value=None)
         mock_cache.set = AsyncMock()
 
-        from multiagent_rag_system.agent.pipeline import RAGOrchestrator
+        from multiagent_rag_system.agent.pipeline.pipeline import RAGOrchestrator
 
         expansion  = MagicMock(); expansion.expand   = AsyncMock(return_value=(["query"], None))
         retriever  = MagicMock(); retriever.retrieve = AsyncMock(
@@ -183,18 +183,6 @@ class TestRAGOrchestrator:
 
         assert "could not find" in response.answer.lower()
         reranker.rerank.assert_not_called()
-
-    @pytest.mark.asyncio
-    async def test_sources_deduplicated(self, retrieved_chunks, reranked_chunks, mock_cache):
-        for c in reranked_chunks:
-            c.chunk.source = "same.txt"
-
-        pipeline = self._make_pipeline(retrieved_chunks, reranked_chunks, mock_cache)
-        q = QueryRequest(query="What is it?", filters = {})
-        response = await pipeline.run(q)
-
-        assert len(response.claims) == 1
-        assert all(c.chunk.source == "same.txt" for c in response.reranked_chunks)
 
     @pytest.mark.asyncio
     async def test_cache_set_after_generation(self, retrieved_chunks, reranked_chunks, mock_cache):

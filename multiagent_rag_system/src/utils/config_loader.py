@@ -184,8 +184,8 @@ class AgentConfig(BaseModel):
     consensus_n_agents:int = 5
     retrieval_relevance_threshold: float = 0.12
     claim_support_threshold: float = 0.20
-    confidence_low_threshold: float = 0.65
-    confidence_medium_threshold: float = 0.40
+    confidence_low_threshold: float = 0.70
+    confidence_medium_threshold: float = 0.30
 
 
 class ServerConfig(BaseModel):

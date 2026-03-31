@@ -74,7 +74,7 @@ class TestRerankerAgent:
     """
 
     def _make_agent(self, enabled: bool = True, top_n: int = 2):
-        from multiagent_rag_system.agent.reranker_agent import RerankerAgent
+        from multiagent_rag_system.agent.agents.reranker_agent import RerankerAgent
         agent = RerankerAgent()
         agent.config = MagicMock()
         agent.config.enabled = enabled

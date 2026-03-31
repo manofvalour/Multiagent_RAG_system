@@ -91,7 +91,7 @@ class ClaimVerificationAgent:
                 supporting = [rc for rc in chunks if _overlap_ratio(sentence, rc.chunk.content)> 0.15]
                 claims.append(Claim(
                     text=sentence, supported = supported,
-                    confidence=round(confidence, 3), supporting_chunks = supporting[:2],
+                    confidence=round(confidence, 3), supporting_chunks = supporting[:3],
                 ))
             
             n_supported = sum(1 for c in claims if c.supported)

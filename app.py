@@ -9,11 +9,12 @@ import uuid
 from contextlib import asynccontextmanager
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException, Request, Response, Depends, Header, status
+from fastapi import FastAPI, HTTPException, Request, Response, Depends, Header, status, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, PlainTextResponse
+from fastapi.responses import JSONResponse, PlainTextResponse, FileResponse
 
 import structlog
+import os
 
 from multiagent_rag_system.agent.agents.doc_ingestion import DocumentIngestionPipeline
 from multiagent_rag_system.agent.pipeline.pipeline import RAGOrchestrator
@@ -34,6 +35,10 @@ from multiagent_rag_system.src.utils.metrics import (
 
 settings = get_settings()
 config = settings.server
+
+# ─── File upload configuration ────────────────────────────────────────────────
+UPLOAD_DIR = "uploads"
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 # ─── Singletons initialised at startup ───────────────────────────────────────
 _pipeline: Optional[RAGOrchestrator] = None
@@ -158,13 +163,49 @@ async def ingest_text(req: IngestRequest):
     return result
 
 @app.post("/ingest_file", response_model=IngestResponse, status_code=status.HTTP_201_CREATED)
-async def ingest_file(req: IngestRequest):
+async def ingest_file(file: UploadFile = File(...)):
     """Ingest a file(pdf, docx, images, or ppt): chunk -> embed -> index in vector store."""
-    result = await _ingestion.ingest_file(req)
+     # Save file to disk
+    file_path = os.path.join(UPLOAD_DIR, file.filename)
+    try:
+        with open(file_path, "wb") as buffer:
+            # Read in chunks for large files
+            while chunk := await file.read(1024 * 1024):
+                buffer.write(chunk)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error saving file: {e}")
+
+    #{"filename": file.filename, "path": file_path, "message": "File uploaded successfully"}
+
+    result = await _ingestion.ingest_file(chunk, file.filename)
     record_ingestion()
     store = await get_vector_store()
     update_store_size(await store.count())
     return result
+
+
+@app.post("/upload/doc")
+async def upload_doc(file: UploadFile = File(...)):
+    """Upload and save a document file (.doc or .docx)."""
+    # Validate file type
+    allowed_types = {
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    }
+    if file.content_type not in allowed_types:
+        raise HTTPException(status_code=415, detail="Invalid file type. Only .doc or .docx allowed.")
+    
+    # Save file to disk
+    file_path = os.path.join(UPLOAD_DIR, file.filename)
+    try:
+        with open(file_path, "wb") as buffer:
+            # Read in chunks for large files
+            while chunk := await file.read(1024 * 1024):
+                buffer.write(chunk)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error saving file: {e}")
+    
+    return {"filename": file.filename, "path": file_path, "message": "File uploaded successfully"}
 
 
 @app.delete("/documents/{doc_id}")

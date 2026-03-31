@@ -88,14 +88,18 @@ class TestChunkRetrieval:
     """
 
     def _make_agent(self, mock_vs, mock_embedder):
-        from multiagent_rag_system.agent.retrieval_agent import ChunkRetrieval
+        from multiagent_rag_system.agent.agents.retrieval_agent import ChunkRetrieval
         agent = ChunkRetrieval.__new__(ChunkRetrieval)
         agent.config = MagicMock()
         agent.config.top_k = 5
         agent.config.similarity_threshold = 0.5
         agent.config.hnsw_ef_search = 64
+        
+        # Initialize attributes that __init__ would normally set
+        agent._embedder = mock_embedder
+        agent._vector_store = mock_vs
 
-        import multiagent_rag_system.agent.retrieval_agent as ra_module
+        import multiagent_rag_system.agent.agents.retrieval_agent as ra_module
         ra_module.get_vector_store = mock_vs
         ra_module.get_embedder = mock_embedder
 
@@ -123,7 +127,7 @@ class TestChunkRetrieval:
 
         import numpy as np
         mock_embedder = MagicMock()
-        mock_embedder.embed = MagicMock(
+        mock_embedder.embed = AsyncMock(
             return_value=np.random.rand(2, 4).astype("float32")
         )
 
@@ -148,7 +152,7 @@ class TestChunkRetrieval:
 
         import numpy as np
         mock_embedder = MagicMock()
-        mock_embedder.embed = MagicMock(
+        mock_embedder.embed = AsyncMock(
             return_value=np.random.rand(2, 4).astype("float32")
         )
 
@@ -170,7 +174,7 @@ class TestChunkRetrieval:
 
         import numpy as np
         mock_embedder = MagicMock()
-        mock_embedder.embed = MagicMock(
+        mock_embedder.embed = AsyncMock(
             return_value=np.random.rand(1, 4).astype("float32")
         )
 
@@ -187,7 +191,7 @@ class TestChunkRetrieval:
 
         import numpy as np
         mock_embedder = MagicMock()
-        mock_embedder.embed = MagicMock(
+        mock_embedder.embed = AsyncMock(
             return_value=np.random.rand(1, 4).astype("float32")
         )
 
@@ -204,7 +208,7 @@ class TestChunkRetrieval:
 
         import numpy as np
         mock_embedder = MagicMock()
-        mock_embedder.embed = MagicMock(
+        mock_embedder.embed = AsyncMock(
             return_value=np.random.rand(1, 4).astype("float32")
         )
 

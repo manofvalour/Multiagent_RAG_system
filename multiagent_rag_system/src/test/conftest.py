@@ -58,15 +58,15 @@ def mock_dependencies(test_settings, mock_embed_model, mock_vector_store, monkey
     
     # Patch the globals
     monkeypatch.setattr(
-        "multiagent_rag_system.agent.doc_ingestion.get_settings",
+        "multiagent_rag_system.agent.agents.doc_ingestion.get_settings",
         sync_get_settings
     )
     monkeypatch.setattr(
-        "multiagent_rag_system.agent.doc_ingestion.get_embedder",
+        "multiagent_rag_system.agent.agents.doc_ingestion.get_embedder",
         mock_get_embedder
     )
     monkeypatch.setattr(
-        "multiagent_rag_system.agent.doc_ingestion.get_vector_store",
+        "multiagent_rag_system.agent.agents.doc_ingestion.get_vector_store",
         mock_get_vector_store
     )
     
@@ -75,3 +75,32 @@ def mock_dependencies(test_settings, mock_embed_model, mock_vector_store, monkey
         "embedder": mock_embedder,
         "vector_store": mock_vector_store,
     }
+
+
+@pytest.fixture
+def docs():
+    """Provide sample documents for testing."""
+    from ..models.models import DocumentChunk
+    
+    def _make_doc(i: int, content: str = None) -> DocumentChunk:
+        return DocumentChunk(
+            id=f"aaaaaaaa-0000-0000-0000-00000000000{i}",
+            content=content or f"RAG is a technique that combines retrieval and generation. Chunk {i}.",
+            chunk_index=i,
+            doc_id=f"doc-00{i}",
+            metadata={},
+        )
+    
+    return [_make_doc(i) for i in range(1, 4)]
+
+
+@pytest.fixture
+def sample_reranked(docs):
+    """Provide sample reranked chunks for testing."""
+    from ..models.models import RerankedChunk
+    
+    return [
+        RerankedChunk(chunk=docs[0], similarity_score=0.92, reranker_score=0.95),
+        RerankedChunk(chunk=docs[1], similarity_score=0.85, reranker_score=0.82),
+        RerankedChunk(chunk=docs[2], similarity_score=0.78, reranker_score=0.70),
+    ]

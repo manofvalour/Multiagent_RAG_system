@@ -42,8 +42,8 @@ settings = get_settings()
 class RAGOrchestrator:
     def __init__(
         self, expansion=QueryExpansionAgent(), retriever= ChunkRetrieval(), 
-        reranker=RerankerAgent(), consensus=ConsensusAgent, cache=SemanticCache(), 
-        evaluator= RAGASEvaluator(), confidence_score= ConfidenceScoringAgent,
+        reranker=RerankerAgent(), consensus=ConsensusAgent(), cache=SemanticCache(), 
+        evaluator= RAGASEvaluator(), confidence_score= ConfidenceScoringAgent(),
         claim_verification= ClaimVerificationAgent()
     ) -> None:
         
@@ -160,7 +160,7 @@ class RAGOrchestrator:
             yield "data: [DONE]\n\n"
             return
 
-        reranked = await self.reranker.rerank(query.query, retrieved)
+        reranked = await self.reranker.rerank(query, retrieved)
 
         # Stream tokens
         token_stream = await self.consensus.run(query.query, reranked)

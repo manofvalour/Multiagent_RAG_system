@@ -375,8 +375,9 @@ class DocumentIngestionPipeline:
         try:
             t0 = time.perf_counter()
             ct = detect_content_type(req.content)
-            await self._process(req.content, ct, req.metadata, t0)
+            result = await self._process(req.content, ct, req.metadata, t0)
             logger.info("Document succesfully ingested to the vector database")
+            return result
 
         except Exception as e:
             logger.error("Failed to parse the text file", error = str(e))
@@ -393,7 +394,7 @@ class DocumentIngestionPipeline:
             # Parse the original bytes — no need to re-read from disk since
             text, ct = await self.parser.parse(content, filename)
 
-            result = await self._process(text, filename, ct, metadata, t0)    
+            result = await self._process(text, ct, metadata, t0)    
             logger.info(f"File ingested successfully", source = filename, 
                         chunks = result.chunks_created, saved_at = saved_path)
             

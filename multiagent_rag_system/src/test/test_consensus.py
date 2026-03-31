@@ -73,7 +73,7 @@ class TestConsensusAgent:
     """
 
     def _make_agent(self, answers: list[str], n: int = None):
-        from multiagent_rag_system.agent.consensus_agent import ConsensusAgent
+        from multiagent_rag_system.agent.agents.consensus_agent import ConsensusAgent
 
         n = n or len(answers)
         # Build mock generators that return preset answers
@@ -112,7 +112,7 @@ class TestConsensusAgent:
     @pytest.mark.asyncio
     async def test_partial_failure_still_returns_answer(self, reranked_chunks):
         """Two generators succeed, one raises — should return DONE with 2 candidates."""
-        from multiagent_rag_system.agent.consensus_agent import ConsensusAgent
+        from multiagent_rag_system.agent.agents.consensus_agent import ConsensusAgent
 
         agent = ConsensusAgent.__new__(ConsensusAgent)
         g_ok1 = MagicMock(); g_ok1.run = AsyncMock(return_value=("Good answer.", MagicMock()))
@@ -127,7 +127,7 @@ class TestConsensusAgent:
 
     @pytest.mark.asyncio
     async def test_all_generators_fail_returns_failed_event(self, reranked_chunks):
-        from multiagent_rag_system.agent.consensus_agent import ConsensusAgent
+        from multiagent_rag_system.agent.agents.consensus_agent import ConsensusAgent
 
         agent = ConsensusAgent.__new__(ConsensusAgent)
         agent.generators = [
