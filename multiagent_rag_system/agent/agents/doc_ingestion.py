@@ -401,39 +401,12 @@ class DocumentIngestionPipeline:
             return result
         
         except MulitagentragException:
-            raise   # already logged and wrapped — re-raise as-is
+            raise
 
         except Exception as e:
             logger.error("failed to ingest file document", error= str(e))
             raise MulitagentragException("Failed to ingest file document", error_details=str(e))
-
-
-    #Public: ingest from a file path on disk
-    async def ingest_file_from_path(self, file_path: str, metadata: dict = {}) -> IngestResponse:
-        """
-        Ingest a file that already exists on disk (e.g. from document_to_access).
-
-        Reads the file in a thread pool (blocking I/O), then delegates to
-        ingest_file() for parsing, chunking, and indexing.
-        """
-        try:
-            path = Path(file_path)
-            if not path.exists():
-                raise FileNotFoundError(f"File not found: {file_path}")
-
-            loop    = asyncio.get_event_loop()
-            content = await loop.run_in_executor(None, path.read_bytes)
-            return await self.ingest_file(content, path.name, metadata)
-
-        except (MulitagentragException, FileNotFoundError):
-            raise
-        except Exception as e:
-            logger.error("Failed to ingest file from path", path=file_path, error=str(e))
-            raise MulitagentragException(
-                "Failed to ingest file from path",
-                error_details=str(e),
-            )
-        
+    
     async def _process(
         self, text: str,
         ct: ContentType, metadata: dict, t0: float,

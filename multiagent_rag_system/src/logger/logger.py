@@ -23,11 +23,11 @@ class CustomLogger:
         file_handler.setFormatter(logging.Formatter("%(message)s"))
 
         console_handler = logging.StreamHandler()
-        console_handler.setLevel(logging.WARNING)
+        console_handler.setLevel(logging.INFO)
         console_handler.setFormatter(logging.Formatter("%(message)s"))
 
         logging.basicConfig(
-            level=logging.WARNING,
+            level=logging.INFO,
             format="%(message)s",
             handlers=[file_handler, console_handler],
         )
@@ -52,7 +52,7 @@ class CustomLogger:
 
 
 # Global, shared logger instance for the package
-#GLOBAL_LOGGER = CustomLogger().get_logger("mulitagent_rag_system")
+GLOBAL_LOGGER = CustomLogger().get_logger("mulitagent_rag_system")
 
 
 #if __name__ == "__main__":

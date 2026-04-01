@@ -5,7 +5,7 @@ from typing import Optional
 import numpy as np
 
 from ...src.utils.config_loader import get_settings
-from ...src.logger import GLOBAL_LOGGER as logger
+from ...src.logger import GLOBAL_LOGGER
 from ...src.exception.custom_exception import MulitagentragException
 from ...src.models.models import (
     AgentEvent, AgentStatus, RerankedChunk)
@@ -13,6 +13,7 @@ from ...src.utils.general_utils import _timed_event
 from ...src.llm.llms import BaseLLMClient, LLMResponse, get_llm_client
 
 settings= get_settings()
+logger = GLOBAL_LOGGER
 class AnswerGeneratorAgent:
     """
     Generates answer based on the validated retrieved. A single LLM call with a

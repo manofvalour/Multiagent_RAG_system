@@ -4,6 +4,7 @@ Routes: /query,/ingest_text, /ingest_file, /delete_documents, /health, /metrics,
 Middleware: CORS, rate-limiting, request-id injection, structured logging
 """
 from __future__ import annotations
+import asyncio
 import time
 import uuid
 from contextlib import asynccontextmanager
@@ -36,11 +37,11 @@ from multiagent_rag_system.src.utils.metrics import (
 settings = get_settings()
 config = settings.server
 
-# ─── File upload configuration ────────────────────────────────────────────────
-UPLOAD_DIR = "uploads"
+#File upload configuration
+UPLOAD_DIR = "data/uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-# ─── Singletons initialised at startup ───────────────────────────────────────
+#Singletons initialised at startup
 _pipeline: Optional[RAGOrchestrator] = None
 _ingestion: Optional[DocumentIngestionPipeline] = None
 _cache: Optional[CacheClient] = None
@@ -61,12 +62,17 @@ async def lifespan(app: FastAPI):
     _ingestion = DocumentIngestionPipeline()
     _cache     = CacheClient()
 
-    # Seed knowledge base in dev mode
-    #if settings.environment == "development":
-     #   await _seed_demo_data()
-
     logger.info("startup_complete")
     yield
+    
+    # Graceful shutdown: clean up resources
+    try:
+        logger.info("shutdown_cleanup", message="Cleaning up resources")
+        # Give any pending tasks a short window to complete
+        await asyncio.sleep(0.5)
+    except Exception as e:
+        logger.warning("shutdown_cleanup_error", error=str(e))
+    
     logger.info("shutdown")
 
 
@@ -165,47 +171,15 @@ async def ingest_text(req: IngestRequest):
 @app.post("/ingest_file", response_model=IngestResponse, status_code=status.HTTP_201_CREATED)
 async def ingest_file(file: UploadFile = File(...)):
     """Ingest a file(pdf, docx, images, or ppt): chunk -> embed -> index in vector store."""
-     # Save file to disk
-    file_path = os.path.join(UPLOAD_DIR, file.filename)
-    try:
-        with open(file_path, "wb") as buffer:
-            # Read in chunks for large files
-            while chunk := await file.read(1024 * 1024):
-                buffer.write(chunk)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error saving file: {e}")
-
-    #{"filename": file.filename, "path": file_path, "message": "File uploaded successfully"}
-
-    result = await _ingestion.ingest_file(chunk, file.filename)
+    # Read file bytes
+    file_content = await file.read()
+    
+    # Ingest the file — DocumentIngestionPipeline handles saving to disk internally
+    result = await _ingestion.ingest_file(content=file_content, filename=file.filename)
     record_ingestion()
     store = await get_vector_store()
     update_store_size(await store.count())
     return result
-
-
-@app.post("/upload/doc")
-async def upload_doc(file: UploadFile = File(...)):
-    """Upload and save a document file (.doc or .docx)."""
-    # Validate file type
-    allowed_types = {
-        "application/msword",
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-    }
-    if file.content_type not in allowed_types:
-        raise HTTPException(status_code=415, detail="Invalid file type. Only .doc or .docx allowed.")
-    
-    # Save file to disk
-    file_path = os.path.join(UPLOAD_DIR, file.filename)
-    try:
-        with open(file_path, "wb") as buffer:
-            # Read in chunks for large files
-            while chunk := await file.read(1024 * 1024):
-                buffer.write(chunk)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error saving file: {e}")
-    
-    return {"filename": file.filename, "path": file_path, "message": "File uploaded successfully"}
 
 
 @app.delete("/documents/{doc_id}")
@@ -317,31 +291,3 @@ async def root():
         "docs": "/docs",
         "health": "/health",
     }
-
-
-# ─── Demo seeding ─────────────────────────────────────────────────────────────
-
-#DEMO_DOCS = [
- #   ("Retrieval-Augmented Generation (RAG) combines a retriever with a large language model. The retriever fetches relevant documents from an external corpus. The generator uses these documents to produce factually grounded answers, significantly reducing hallucination.", "RAG Overview"),
-  #  ("Hallucination in large language models refers to the confident generation of factually incorrect or unsupported content. Grounding model responses in retrieved documents reduces hallucination rates by 35-45% compared to closed-book generation.", "LLM Hallucination Research"),
-   # ("Async Python using asyncio enables concurrent execution of I/O-bound tasks without multi-threading. The asyncio.gather function runs coroutines concurrently, making it ideal for parallel agent orchestration in multi-agent systems.", "Python Async Guide"),
-    #("Multi-agent systems distribute complex tasks across specialised agents. Each agent handles a narrow sub-problem, and their outputs are aggregated. This division of labour improves accuracy, reduces individual agent errors, and provides interpretable audit trails.", "Multi-Agent Architecture"),
-   # ("Vector databases use dense numerical embeddings to enable semantic similarity search. Documents are converted to high-dimensional vectors, and queries are matched by cosine or dot-product similarity. Popular options include FAISS, pgvector, Pinecone, and Qdrant.", "Vector Search Systems"),
- #   ("Claim verification is a post-generation quality-control step. An LLM or lexical checker evaluates each atomic assertion in the generated answer against source documents. Claims without source support are flagged, substantially reducing user-facing hallucinations.", "Fact Verification Methods"),
-  #  ("Consensus-based generation runs multiple LLM instances in parallel with slight temperature variation. The most internally consistent output is selected via voting. This ensemble approach reduces variance and single-model hallucinations by approximately 20-30%.", "Ensemble LLM Methods"),
-   # ("FAISS (Facebook AI Similarity Search) is an open-source library for efficient similarity search on dense vectors. It supports exact and approximate nearest neighbour search and scales to billions of vectors with GPU acceleration.", "FAISS Documentation"),
-    #("Sentence-BERT (SBERT) produces fixed-size sentence embeddings optimised for semantic similarity tasks. Embeddings from SBERT models outperform averaged word vectors on most retrieval benchmarks and are widely used in RAG pipelines.", "Sentence Embeddings"),
- #   ("Confidence scoring aggregates multiple quality signals: claim support rate, average retrieval relevance, and source-answer word overlap. Scores below 0.4 indicate high hallucination risk and should trigger escalation or human review.", "RAG Quality Metrics"),
-#]
-
-
-#async def _seed_demo_data():
- #   store = await get_vector_store()
-  #  if await store.count() > 0:
-   #     return
-    #logger.info("seeding_demo_data", n_docs=len(DEMO_DOCS))
-  #  for content, source in DEMO_DOCS:
-   #     req = IngestRequest(content=content, source=source, chunk_strategy="sentence")
-   #     await _ingestion.ingest(req)
-   # logger.info("demo_data_seeded")
-
