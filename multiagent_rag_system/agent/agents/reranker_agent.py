@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import sys
 import time
+from langsmith import traceable
 
 from multiagent_rag_system.src.utils.config_loader import get_settings
 from multiagent_rag_system.src.logger import GLOBAL_LOGGER as logger
@@ -29,6 +30,7 @@ class RerankerAgent:
             self._model = CrossEncoder(self.config.model)
             logger.info(f"CrossEncoder loaded: {self.config.model}")
  
+    @traceable(name = "Reranker Agent")
     async def rerank(self, query: str, 
                   chunks: list[RetrievedChunk]) -> tuple[list[RerankedChunk], AgentEvent]:
         

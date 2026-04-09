@@ -4,6 +4,7 @@ import re
 import time
 from typing import Optional
 import sys
+from langsmith import traceable
 
 from multiagent_rag_system.src.utils.config_loader import get_settings
 from multiagent_rag_system.src.logger import GLOBAL_LOGGER as logger
@@ -27,6 +28,7 @@ class ConfidenceScoringAgent:
     def __init__(self):
         self.config = settings.agents
 
+    @traceable(name="Confidence Scoring Agent")
     async def run(
             self, answer: str, claims: list[Claim], chunks: list[RerankedChunk]
     ) -> tuple[ConfidenceBreakdown, HallucinationRisk, AgentEvent]:

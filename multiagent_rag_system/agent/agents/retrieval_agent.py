@@ -4,6 +4,7 @@ import time
 from typing import Optional
 import numpy as np
 import sys
+from langsmith import traceable
 
 from multiagent_rag_system.src.utils.config_loader import get_settings
 from multiagent_rag_system.src.logger import GLOBAL_LOGGER as logger
@@ -35,6 +36,7 @@ class ChunkRetrieval:
         if self._vector_store is None:
             self._vector_store = await get_vector_store()
 
+    @traceable(name="Chunk Retrieval Agent")
     async def retrieve(
         self, queries:  list[str],
         filters:  Optional[dict] = None

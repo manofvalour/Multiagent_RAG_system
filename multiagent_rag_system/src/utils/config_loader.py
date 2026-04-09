@@ -16,6 +16,8 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
+from pydantic import BaseModel, Field, AnyHttpUrl, model_validator
+from typing import Optional
 from pydantic import BaseModel, Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -108,6 +110,8 @@ class QueryExpansionConfig(BaseModel):
     strategy: ExpansionStrategy = ExpansionStrategy.BOTH
     num_queries: int = 3
     hyde_temperature: float = 0.7
+    timeout_seconds: int = Field(default=15, ge=1)
+    max_retries: int = Field(default=2, ge=0)
 
 
 class EmbeddingsConfig(BaseModel):
@@ -162,16 +166,85 @@ class AuthConfig(BaseModel):
     api_key_header: str = "X-API-Key"
     api_keys:list[str] = []
 
-
-class ObservabilityConfig(BaseModel):
-    """OpenTelemetry + LangSmith tracing."""
+class OTelConfig(BaseModel):
+    """OpenTelemetry tracing and metrics config."""
+    enabled: bool = False
+    endpoint: AnyHttpUrl = "http://localhost:4317"
+    service_name: str = "multiagent-rag-api"
+    service_version: str = "1.0.0"
     enable_metrics: bool = True
     enable_tracing: bool = True
-    otel_enabled:bool = False
-    otlp_endpoint: str  = "http://localhost:4317"
-    langsmith_enabled: bool = False
-    sentry_dsn:str  = ""
 
+    @model_validator(mode="after")
+    def warn_if_localhost_in_production(self) -> "OTelConfig":
+        import os
+        if (
+            os.getenv("ENVIRONMENT") == "production"
+            and self.enabled
+            and "localhost" in str(self.endpoint)
+        ):
+            raise ValueError(
+                "OTel endpoint is localhost but ENVIRONMENT=production. "
+                "Set OTLP_ENDPOINT to a real collector."
+            )
+        return self
+
+
+class LangSmithConfig(BaseModel):
+    """LangSmith LLM tracing config."""
+    enabled: bool = False
+    api_key: Optional[str] = None
+    project: str = "multiagent-rag"
+    endpoint: AnyHttpUrl = "https://api.smith.langchain.com"
+
+    @model_validator(mode="after")
+    def api_key_required_if_enabled(self) -> "LangSmithConfig":
+        if self.enabled and not self.api_key:
+            raise ValueError(
+                "LangSmith is enabled but LANGSMITH_API_KEY is not set."
+            )
+        return self
+
+
+class SentryConfig(BaseModel):
+    """Sentry error tracking config."""
+    dsn: Optional[str] = None           # None means disabled, not ""
+    traces_sample_rate: float = Field(default=0.1, ge=0.0, le=1.0)
+    environment: str = "development"
+
+    @property
+    def enabled(self) -> bool:
+        return bool(self.dsn)
+
+
+class ObservabilityConfig(BaseModel):
+    """Unified observability configuration."""
+    otel: OTelConfig = OTelConfig()
+    langsmith: LangSmithConfig = LangSmithConfig()
+    sentry: SentryConfig = SentryConfig()
+
+    @classmethod
+    def from_env(cls) -> "ObservabilityConfig":
+        """Build config from environment variables."""
+        import os
+        return cls(
+            otel=OTelConfig(
+                enabled=os.getenv("OTEL_ENABLED", "false").lower() == "true",
+                endpoint=os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4317"),
+                service_name=os.getenv("OTEL_SERVICE_NAME", "multiagent-rag-api"),
+                service_version=os.getenv("APP_VERSION", "1.0.0"),
+            ),
+            langsmith=LangSmithConfig(
+                enabled=os.getenv("LANGCHAIN_TRACING_V2", "false").lower() == "true",
+                api_key=os.getenv("LANGSMITH_API_KEY"),
+                project=os.getenv("LANGCHAIN_PROJECT", "multi_agent_rag"),
+            ),
+            sentry=SentryConfig(
+                dsn=os.getenv("SENTRY_DSN") or None,
+                traces_sample_rate=float(os.getenv("SENTRY_TRACES_SAMPLE_RATE", "0.1")),
+                environment=os.getenv("ENVIRONMENT", "development"),
+            ),
+        )
 
 class EvaluationConfig(BaseModel):
     """RAGAS quality evaluation — async, sampled."""
@@ -260,7 +333,7 @@ class Settings(BaseSettings):
 
     # ── Structured sub-configs (populated from config.yaml sections) ───────
     server: ServerConfig = ServerConfig()
-    jwt: JWTConfig = JWTConfig()
+    #jwt: JWTConfig = JWTConfig()
     retriever: RetrieverConfig = RetrieverConfig()
     reranker: RerankerConfig = RerankerConfig()
     query_expansion: QueryExpansionConfig  = QueryExpansionConfig()
@@ -283,16 +356,16 @@ class Settings(BaseSettings):
     def is_production(self) -> bool:
         return self.environment == Environment.PRODUCTION
 
-   # @property
-    #def active_api_key(self) -> str:
-     #   """Return the raw API key string for the active LLM provider."""
-      #  mapping = {
-       #     LLMProvider.GROQ:      self.groq_api_key,
-        #    LLMProvider.ANTHROPIC: self.anthropic_api_key,
-         #   LLMProvider.OPENAI:    self.openai_api_key,
-       # }
-       # secret = mapping[self.active_provider]
-        #return secret.get_secret_value() if secret else ""
+    @property
+    def active_api_key(self) -> str:
+        """Return the raw API key string for the active LLM provider."""
+        mapping = {
+            LLMProvider.GROQ:      self.groq_api_key,
+            LLMProvider.ANTHROPIC: self.anthropic_api_key,
+            LLMProvider.OPENAI:    self.openai_api_key,
+        }
+        secret = mapping[self.active_provider]
+        return secret.get_secret_value() if secret else ""
 
     #Constructors
     @classmethod

@@ -70,14 +70,14 @@ class TestRAGOrchestrator:
     the output response shape and control flow.
 
     Agents mocked:
-      expansion      — returns (["original"], None)
-      retriever      — returns (sample_retrieved, event)
-      reranker       — returns (sample_reranked, event)
-      consensus      — returns ("Generated answer.", [...], event)
+      expansion — returns (["original"], None)
+      retriever — returns (sample_retrieved, event)
+      reranker — returns (sample_reranked, event)
+      consensus — returns ("Generated answer.", [...], event)
       claim_verifier — returns ([Claim(...)], event)
-      confidence     — returns (ConfidenceBreakdown(...), LOW, event)
-      evaluator      — returns None (sampled out)
-      cache          — get=None (miss), set=noop
+      confidence — returns (ConfidenceBreakdown(...), LOW, event)
+      evaluator — returns None (sampled out)
+      cache — get=None (miss), set=noop
     """
 
     def _make_event(self, message: str = "ok") -> AgentEvent:

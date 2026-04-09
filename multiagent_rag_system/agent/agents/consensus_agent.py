@@ -2,6 +2,7 @@ from __future__ import annotations
 import asyncio
 import time
 from collections import Counter
+from langsmith import traceable
 
 from multiagent_rag_system.src.utils.config_loader import get_settings
 from multiagent_rag_system.src.logger import GLOBAL_LOGGER as logger
@@ -24,6 +25,7 @@ class ConsensusAgent:
     def __init__(self, n:int= settings.agents.consensus_n_agents):
         self.generators = [AnswerGeneratorAgent(agent_id=i) for i in range(n)]
 
+    @traceable(name="Consensus Agent")
     async def run(self,
                 query:str, chunks: list[RerankedChunk]
               )-> tuple[str, list[str], AgentEvent]:

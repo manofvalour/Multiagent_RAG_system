@@ -1,5 +1,4 @@
 """
-src/agents/evaluator.py
 RAGAS-based quality evaluation, run asynchronously on a sampled fraction
 of queries so it never adds latency to the live response path.
 """
@@ -19,11 +18,7 @@ settings = get_settings()
 class RAGASEvaluator:
     """
     Wraps RAGAS evaluation behind two guards:
-
-    1. Enabled flag  — evaluation.enabled in config.yaml
-    2. Sample gate   — only runs on (sample_rate * 100)% of calls,
-                       e.g. sample_rate=0.1 means 10% of queries are evaluated
-    """
+   """
 
     def __init__(self) -> None:
         # Pull evaluation sub-config from the merged Settings object.
@@ -39,16 +34,12 @@ class RAGASEvaluator:
         ground_truth:Optional[str] = None,
     ) -> Optional[RAGASScores]:
         """
-        Sample-gated: skips (1 - sample_rate) fraction of calls.
         Runs the blocking RAGAS evaluate() in a thread pool so it
         never blocks the asyncio event loop.
 
         Returns RAGASScores if evaluation ran, None if skipped or failed.
         """
-        # Guard 1: feature flag
-        # Guard 2: probabilistic sampling — random.random() is in [0, 1),
-        #          so random.random() > 0.1 is True 90% of the time when
-        #          sample_rate=0.1, meaning evaluation is skipped 90% of calls
+
         if not self.cfg.enabled or random.random() > self.cfg.sample_rate:
             return None
 
@@ -75,16 +66,11 @@ class RAGASEvaluator:
         """
         Synchronous RAGAS execution — always called inside run_in_executor.
 
-        RAGAS makes its own LLM calls internally. It reads OPENAI_API_KEY from
-        the environment by default, but we use the active provider's key instead
-        so the evaluator respects whichever LLM is configured in config.yaml.
+        RAGAS makes its own LLM calls internally.
         """
         try:
             import os
-            # settings.active_api_key resolves the correct key for the active
-            # provider (groq / anthropic / openai) and unwraps the SecretStr.
-            # We set OPENAI_API_KEY because RAGAS uses the OpenAI SDK internally
-            # regardless of which provider generated the answer.
+      
             os.environ["OPENAI_API_KEY"] = self.settings.active_api_key
 
             from datasets import Dataset
@@ -97,11 +83,9 @@ class RAGASEvaluator:
             )
 
             # Extract plain text from RerankedChunk objects.
-            # RAGAS only needs the content strings, not scores or metadata.
             contexts = [c.chunk.content for c in chunks]
 
             # RAGAS Dataset format: each key is a column, each value is a list.
-            # One row per query/answer pair — we evaluate one at a time.
             data: dict = {
                 "question": [query],
                 "answer":   [answer],

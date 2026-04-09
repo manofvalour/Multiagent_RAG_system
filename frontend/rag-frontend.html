@@ -1,0 +1,1162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>RAG — Multi-Agent Pipeline</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Fraunces:ital,opsz,wght@0,9..144,200;0,9..144,300;1,9..144,200&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #0d0d0d;
+    --surface:   #141414;
+    --border:    #222;
+    --muted:     #3a3a3a;
+    --text:      #e8e4dc;
+    --text-dim:  #666;
+    --accent:    #c8b89a;
+    --accent-lo: rgba(200,184,154,.08);
+    --green:     #5a8a6a;
+    --red:       #8a4a4a;
+    --yellow:    #8a7a4a;
+    --radius:    6px;
+    --mono:      'DM Mono', monospace;
+    --serif:     'Fraunces', serif;
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.6;
+    min-height: 100vh;
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    grid-template-rows: auto 1fr;
+  }
+
+  /* ── Header ─────────────────────────────────────── */
+  header {
+    grid-column: 1 / -1;
+    border-bottom: 1px solid var(--border);
+    padding: 0 28px;
+    height: 52px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky; top: 0; z-index: 100;
+    background: var(--bg);
+  }
+
+  .logo {
+    font-family: var(--serif);
+    font-weight: 200;
+    font-size: 18px;
+    letter-spacing: -.5px;
+    color: var(--text);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .logo-badge {
+    font-family: var(--mono);
+    font-size: 9px;
+    font-weight: 500;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--accent);
+    background: var(--accent-lo);
+    border: 1px solid rgba(200,184,154,.2);
+    padding: 2px 7px;
+    border-radius: 3px;
+  }
+
+  #status-pill {
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    padding: 3px 10px;
+    border-radius: 20px;
+    border: 1px solid var(--muted);
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: all .2s;
+    display: flex; align-items: center; gap: 6px;
+  }
+  #status-pill .dot {
+    width: 6px; height: 6px; border-radius: 50%; background: var(--muted);
+    transition: background .3s;
+  }
+  #status-pill.healthy { border-color: var(--green); color: #7ab88a; }
+  #status-pill.healthy .dot { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  #status-pill.degraded { border-color: var(--yellow); color: #b8a86a; }
+  #status-pill.degraded .dot { background: var(--yellow); }
+  #status-pill.unhealthy { border-color: var(--red); color: #b87a7a; }
+  #status-pill.unhealthy .dot { background: var(--red); }
+
+  /* ── Sidebar ─────────────────────────────────────── */
+  aside {
+    border-right: 1px solid var(--border);
+    padding: 24px 0;
+    position: sticky; top: 52px;
+    height: calc(100vh - 52px);
+    overflow-y: auto;
+  }
+
+  .nav-section {
+    padding: 0 20px;
+    margin-bottom: 28px;
+  }
+  .nav-label {
+    font-size: 9px;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+    padding: 0 4px;
+  }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 7px 10px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    color: var(--text-dim);
+    font-size: 12px;
+    transition: all .15s;
+    border: 1px solid transparent;
+    user-select: none;
+  }
+  .nav-item:hover { color: var(--text); background: rgba(255,255,255,.03); }
+  .nav-item.active {
+    color: var(--accent);
+    background: var(--accent-lo);
+    border-color: rgba(200,184,154,.15);
+  }
+  .nav-icon { font-size: 14px; width: 18px; text-align: center; }
+
+  /* ── Main ─────────────────────────────────────────── */
+  main {
+    overflow-y: auto;
+    height: calc(100vh - 52px);
+  }
+
+  .panel {
+    display: none;
+    padding: 32px 36px;
+    animation: fadein .2s ease;
+    max-width: 860px;
+  }
+  .panel.active { display: block; }
+
+  @keyframes fadein { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+  /* ── Panel Header ─────────────────────────────────── */
+  .panel-header { margin-bottom: 28px; }
+  .panel-title {
+    font-family: var(--serif);
+    font-weight: 200;
+    font-size: 26px;
+    letter-spacing: -.5px;
+    color: var(--text);
+    margin-bottom: 4px;
+  }
+  .panel-sub {
+    color: var(--text-dim);
+    font-size: 11px;
+    letter-spacing: .5px;
+  }
+
+  /* ── Form Elements ────────────────────────────────── */
+  .field { margin-bottom: 16px; }
+  .field label {
+    display: block;
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+  }
+
+  input[type="text"],
+  input[type="number"],
+  textarea,
+  select {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 13px;
+    padding: 10px 14px;
+    border-radius: var(--radius);
+    outline: none;
+    transition: border-color .2s;
+    resize: vertical;
+  }
+  input[type="text"]:focus,
+  input[type="number"]:focus,
+  textarea:focus,
+  select:focus { border-color: var(--accent); }
+  ::placeholder { color: var(--muted); }
+  select option { background: #1a1a1a; }
+
+  textarea { min-height: 90px; }
+
+  /* ── Buttons ──────────────────────────────────────── */
+  .btn {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    padding: 9px 20px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    cursor: pointer;
+    transition: all .15s;
+    display: inline-flex; align-items: center; gap: 8px;
+  }
+  .btn-primary {
+    background: var(--accent);
+    color: #0d0d0d;
+    border-color: var(--accent);
+    font-weight: 500;
+  }
+  .btn-primary:hover { background: #d4c4a8; }
+  .btn-primary:disabled { opacity: .4; cursor: not-allowed; }
+  .btn-ghost { background: transparent; color: var(--text-dim); }
+  .btn-ghost:hover { color: var(--text); border-color: var(--muted); }
+  .btn-danger { background: transparent; color: #b87a7a; border-color: var(--red); }
+  .btn-danger:hover { background: rgba(138,74,74,.1); }
+
+  /* ── Divider ─────────────────────────────────────── */
+  .divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 24px 0;
+  }
+
+  /* ── Response Box ────────────────────────────────── */
+  .response-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    margin-top: 20px;
+    display: none;
+  }
+  .response-box.visible { display: block; animation: fadein .25s ease; }
+
+  .response-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(255,255,255,.02);
+  }
+  .response-header-left { display: flex; align-items: center; gap: 12px; }
+  .response-tag {
+    font-size: 9px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 3px;
+    border: 1px solid;
+  }
+  .tag-low  { color: #7ab88a; border-color: var(--green); background: rgba(90,138,106,.08); }
+  .tag-med  { color: #b8a86a; border-color: var(--yellow); background: rgba(138,122,74,.08); }
+  .tag-high { color: #b87a7a; border-color: var(--red); background: rgba(138,74,74,.08); }
+  .tag-ok   { color: #7ab88a; border-color: var(--green); background: rgba(90,138,106,.08); }
+  .tag-info { color: var(--accent); border-color: rgba(200,184,154,.3); background: var(--accent-lo); }
+
+  .response-body { padding: 20px; }
+  .response-answer {
+    color: var(--text);
+    line-height: 1.75;
+    font-size: 13.5px;
+    margin-bottom: 16px;
+  }
+
+  /* ── Stats Row ────────────────────────────────────── */
+  .stats-row {
+    display: flex; gap: 20px; flex-wrap: wrap;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+  }
+  .stat { display: flex; flex-direction: column; gap: 2px; }
+  .stat-val {
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: 22px;
+    font-weight: 200;
+    color: var(--accent);
+  }
+  .stat-lbl {
+    font-size: 9px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+
+  /* ── Claims ────────────────────────────────────────── */
+  .claims-section { margin-top: 16px; }
+  .claims-title {
+    font-size: 9px; letter-spacing: 2px; text-transform: uppercase;
+    color: var(--text-dim); margin-bottom: 10px;
+  }
+  .claim {
+    display: flex; gap: 10px; align-items: flex-start;
+    padding: 8px 10px;
+    border-radius: 4px;
+    margin-bottom: 4px;
+    font-size: 12px;
+  }
+  .claim.supported { background: rgba(90,138,106,.06); }
+  .claim.unsupported { background: rgba(138,74,74,.06); }
+  .claim-icon { margin-top: 1px; }
+  .claim-text { color: var(--text); }
+
+  /* ── Chunks ────────────────────────────────────────── */
+  .chunks-section { margin-top: 14px; }
+  .chunk {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    margin-bottom: 8px;
+    background: rgba(255,255,255,.01);
+  }
+  .chunk-meta {
+    font-size: 10px; letter-spacing: 1px;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+    display: flex; gap: 12px;
+  }
+  .chunk-text { color: var(--text); font-size: 12px; line-height: 1.65; }
+
+  /* ── Loading ──────────────────────────────────────── */
+  .loading {
+    display: none;
+    align-items: center;
+    gap: 10px;
+    color: var(--text-dim);
+    font-size: 12px;
+    margin-top: 14px;
+  }
+  .loading.visible { display: flex; }
+  .spinner {
+    width: 16px; height: 16px;
+    border: 2px solid var(--muted);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin .7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Error ────────────────────────────────────────── */
+  .error-box {
+    display: none;
+    background: rgba(138,74,74,.08);
+    border: 1px solid var(--red);
+    border-radius: var(--radius);
+    padding: 12px 16px;
+    color: #b87a7a;
+    font-size: 12px;
+    margin-top: 14px;
+  }
+  .error-box.visible { display: block; }
+
+  /* ── Health Panel ─────────────────────────────────── */
+  .health-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px;
+    margin-top: 20px;
+  }
+  .health-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+  }
+  .health-card-name {
+    font-size: 10px; letter-spacing: 2px; text-transform: uppercase;
+    color: var(--text-dim); margin-bottom: 10px;
+  }
+  .health-status {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 13px;
+  }
+  .health-dot {
+    width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+  }
+  .health-detail { font-size: 11px; color: var(--text-dim); margin-top: 6px; }
+  .health-latency { font-size: 11px; color: var(--text-dim); margin-top: 4px; }
+
+  .health-summary {
+    display: flex; align-items: center; gap: 14px;
+    padding: 14px 18px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 20px;
+  }
+  .health-summary-status {
+    font-family: var(--serif);
+    font-size: 20px;
+    font-weight: 200;
+    font-style: italic;
+  }
+  .uptime-badge {
+    margin-left: auto;
+    font-size: 10px; letter-spacing: 1px;
+    color: var(--text-dim);
+  }
+
+  /* ── Analytics ────────────────────────────────────── */
+  .analytics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .metric-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+  }
+  .metric-val {
+    font-family: var(--serif);
+    font-size: 28px;
+    font-weight: 200;
+    font-style: italic;
+    color: var(--accent);
+    line-height: 1;
+    margin-bottom: 6px;
+  }
+  .metric-lbl {
+    font-size: 9px; letter-spacing: 2px; text-transform: uppercase; color: var(--text-dim);
+  }
+
+  .risk-bar-section { margin-top: 20px; }
+  .risk-row {
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 8px;
+  }
+  .risk-label { font-size: 10px; letter-spacing: 1px; width: 52px; color: var(--text-dim); }
+  .risk-track {
+    flex: 1; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden;
+  }
+  .risk-fill { height: 100%; border-radius: 3px; transition: width .6s ease; }
+  .risk-count { font-size: 10px; color: var(--text-dim); width: 28px; text-align: right; }
+
+  .sources-section { margin-top: 20px; }
+  .source-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+  }
+  .source-row:last-child { border-bottom: none; }
+  .source-name { color: var(--text); max-width: 70%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .source-count { color: var(--accent); font-style: italic; font-family: var(--serif); font-size: 16px; font-weight: 200; }
+
+  /* ── Ingest ───────────────────────────────────────── */
+  .file-drop {
+    border: 1px dashed var(--muted);
+    border-radius: var(--radius);
+    padding: 32px;
+    text-align: center;
+    cursor: pointer;
+    transition: all .2s;
+    color: var(--text-dim);
+  }
+  .file-drop:hover, .file-drop.drag { border-color: var(--accent); color: var(--text); }
+  .file-drop-icon { font-size: 24px; margin-bottom: 8px; }
+  .file-drop-sub { font-size: 11px; margin-top: 4px; }
+
+  .ingest-result {
+    display: none;
+    background: rgba(90,138,106,.06);
+    border: 1px solid var(--green);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    margin-top: 14px;
+    font-size: 12px;
+    color: #7ab88a;
+  }
+  .ingest-result.visible { display: block; }
+
+  /* ── Delete ────────────────────────────────────────── */
+  .delete-result {
+    display: none;
+    border-radius: var(--radius);
+    padding: 12px 16px;
+    margin-top: 14px;
+    font-size: 12px;
+  }
+  .delete-result.ok  { display:block; background:rgba(90,138,106,.06); border:1px solid var(--green); color:#7ab88a; }
+  .delete-result.err { display:block; background:rgba(138,74,74,.08); border:1px solid var(--red); color:#b87a7a; }
+
+  /* ── Config bar ───────────────────────────────────── */
+  .config-row {
+    display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap;
+  }
+  .config-row .field { flex: 1; min-width: 140px; margin-bottom: 0; }
+
+  /* ── Scrollbar ─────────────────────────────────────── */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  /* ── Responsive ────────────────────────────────────── */
+  @media (max-width: 680px) {
+    body { grid-template-columns: 1fr; }
+    aside { display: none; }
+    .panel { padding: 24px 20px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<header>
+  <div class="logo">
+    RAG <span class="logo-badge">7-Agent</span>
+  </div>
+  <div id="status-pill" onclick="loadHealth()" title="Click to refresh health">
+    <span class="dot"></span>
+    <span id="status-text">checking…</span>
+  </div>
+</header>
+
+<!-- Sidebar -->
+<aside>
+  <div class="nav-section">
+    <div class="nav-label">Pipeline</div>
+    <div class="nav-item active" data-panel="query" onclick="switchPanel(this)">
+      <span class="nav-icon">◈</span> Query
+    </div>
+    <div class="nav-item" data-panel="ingest-text" onclick="switchPanel(this)">
+      <span class="nav-icon">⊕</span> Ingest Text
+    </div>
+    <div class="nav-item" data-panel="ingest-file" onclick="switchPanel(this)">
+      <span class="nav-icon">⊞</span> Ingest File
+    </div>
+    <div class="nav-item" data-panel="delete" onclick="switchPanel(this)">
+      <span class="nav-icon">⊗</span> Delete Doc
+    </div>
+  </div>
+  <div class="nav-section">
+    <div class="nav-label">Observability</div>
+    <div class="nav-item" data-panel="health" onclick="switchPanel(this)">
+      <span class="nav-icon">◉</span> Health
+    </div>
+    <div class="nav-item" data-panel="analytics" onclick="switchPanel(this)">
+      <span class="nav-icon">◎</span> Analytics
+    </div>
+  </div>
+  <div class="nav-section">
+    <div class="nav-label">Settings</div>
+    <div class="field" style="padding: 0 4px;">
+      <label>Base URL</label>
+      <input type="text" id="base-url" value="http://localhost:8000" placeholder="http://localhost:8000" />
+    </div>
+  </div>
+</aside>
+
+<!-- Main -->
+<main>
+
+  <!-- ── Query Panel ─────────────────────────── -->
+  <div class="panel active" id="panel-query">
+    <div class="panel-header">
+      <div class="panel-title">Query</div>
+      <div class="panel-sub">Run the full 7-agent hallucination reduction pipeline</div>
+    </div>
+
+    <div class="field">
+      <label>Question</label>
+      <textarea id="query-text" placeholder="What are the main risk factors described in the documents?"></textarea>
+    </div>
+
+    <div class="config-row">
+      <div class="field">
+        <label>Max Tokens</label>
+        <input type="number" id="query-tokens" value="1024" min="64" max="8192" />
+      </div>
+      <div class="field">
+        <label>Top-K Chunks</label>
+        <input type="number" id="query-topk" value="5" min="1" max="20" />
+      </div>
+      <div class="field">
+        <label>Min Confidence</label>
+        <input type="number" id="query-minscore" value="0.0" min="0" max="1" step="0.05" />
+      </div>
+    </div>
+
+    <div style="display:flex; gap:8px; margin-top:4px;">
+      <button class="btn btn-primary" id="query-btn" onclick="runQuery()">
+        <span>Run Pipeline</span>
+      </button>
+      <button class="btn btn-ghost" onclick="clearQuery()">Clear</button>
+    </div>
+
+    <div class="loading" id="query-loading">
+      <div class="spinner"></div>
+      <span>Agents processing…</span>
+    </div>
+    <div class="error-box" id="query-error"></div>
+
+    <div class="response-box" id="query-result">
+      <div class="response-header">
+        <div class="response-header-left">
+          <span class="response-tag tag-info" id="res-provider">—</span>
+          <span class="response-tag" id="res-risk">—</span>
+        </div>
+        <span style="font-size:10px; color:var(--text-dim);" id="res-latency">—</span>
+      </div>
+      <div class="response-body">
+        <div class="response-answer" id="res-answer"></div>
+
+        <div class="stats-row">
+          <div class="stat"><div class="stat-val" id="st-conf">—</div><div class="stat-lbl">Confidence</div></div>
+          <div class="stat"><div class="stat-val" id="st-chunks">—</div><div class="stat-lbl">Chunks</div></div>
+          <div class="stat"><div class="stat-val" id="st-claims">—</div><div class="stat-lbl">Claims</div></div>
+          <div class="stat"><div class="stat-val" id="st-supported">—</div><div class="stat-lbl">Supported</div></div>
+        </div>
+
+        <div class="claims-section" id="claims-section">
+          <div class="claims-title">Claim Verification</div>
+          <div id="claims-list"></div>
+        </div>
+
+        <details style="margin-top:14px;" id="chunks-details">
+          <summary style="cursor:pointer; font-size:10px; letter-spacing:2px; text-transform:uppercase; color:var(--text-dim); user-select:none;">
+            Retrieved Chunks
+          </summary>
+          <div class="chunks-section" id="chunks-list"></div>
+        </details>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Ingest Text Panel ───────────────────── -->
+  <div class="panel" id="panel-ingest-text">
+    <div class="panel-header">
+      <div class="panel-title">Ingest Text</div>
+      <div class="panel-sub">Chunk → embed → index into the vector store</div>
+    </div>
+
+    <div class="field">
+      <label>Document Content</label>
+      <textarea id="ingest-content" style="min-height:140px;" placeholder="Paste your document text here…"></textarea>
+    </div>
+    <div class="config-row">
+      <div class="field">
+        <label>Document ID (optional)</label>
+        <input type="text" id="ingest-doc-id" placeholder="auto-generated if empty" />
+      </div>
+      <div class="field">
+        <label>Source Label</label>
+        <input type="text" id="ingest-source" placeholder="e.g. annual_report_2024" />
+      </div>
+    </div>
+
+    <div style="margin-top:8px;">
+      <button class="btn btn-primary" id="ingest-text-btn" onclick="ingestText()">Index Document</button>
+    </div>
+
+    <div class="loading" id="ingest-text-loading">
+      <div class="spinner"></div>
+      <span>Chunking and embedding…</span>
+    </div>
+    <div class="error-box" id="ingest-text-error"></div>
+    <div class="ingest-result" id="ingest-text-result"></div>
+  </div>
+
+  <!-- ── Ingest File Panel ──────────────────── -->
+  <div class="panel" id="panel-ingest-file">
+    <div class="panel-header">
+      <div class="panel-title">Ingest File</div>
+      <div class="panel-sub">PDF, DOCX, images, or PPTX → vector store</div>
+    </div>
+
+    <div class="file-drop" id="file-drop"
+         onclick="document.getElementById('file-input').click()"
+         ondragover="fileDragOver(event)"
+         ondragleave="fileDragLeave(event)"
+         ondrop="fileDrop(event)">
+      <div class="file-drop-icon">⊞</div>
+      <div id="file-drop-text">Drop file here or click to browse</div>
+      <div class="file-drop-sub">PDF · DOCX · PNG · JPG · PPTX</div>
+    </div>
+    <input type="file" id="file-input" style="display:none" accept=".pdf,.docx,.png,.jpg,.jpeg,.pptx" onchange="fileSelected(this)" />
+
+    <div style="margin-top:16px;">
+      <button class="btn btn-primary" id="ingest-file-btn" onclick="ingestFile()" disabled>Upload & Index</button>
+    </div>
+
+    <div class="loading" id="ingest-file-loading">
+      <div class="spinner"></div>
+      <span>Uploading and embedding…</span>
+    </div>
+    <div class="error-box" id="ingest-file-error"></div>
+    <div class="ingest-result" id="ingest-file-result"></div>
+  </div>
+
+  <!-- ── Delete Panel ───────────────────────── -->
+  <div class="panel" id="panel-delete">
+    <div class="panel-header">
+      <div class="panel-title">Delete Document</div>
+      <div class="panel-sub">Remove all chunks for a document from the vector store</div>
+    </div>
+
+    <div class="field">
+      <label>Document ID</label>
+      <input type="text" id="delete-doc-id" placeholder="doc_abc123…" />
+    </div>
+
+    <button class="btn btn-danger" onclick="deleteDoc()">⊗ Delete Document</button>
+
+    <div class="loading" id="delete-loading">
+      <div class="spinner"></div>
+      <span>Removing…</span>
+    </div>
+    <div class="delete-result" id="delete-result"></div>
+  </div>
+
+  <!-- ── Health Panel ───────────────────────── -->
+  <div class="panel" id="panel-health">
+    <div class="panel-header">
+      <div class="panel-title">Health</div>
+      <div class="panel-sub">Deep health check across all system components</div>
+    </div>
+
+    <div id="health-summary" class="health-summary" style="display:none">
+      <div class="health-dot" id="health-big-dot" style="width:10px;height:10px;"></div>
+      <div class="health-summary-status" id="health-big-status">—</div>
+      <div class="uptime-badge" id="health-uptime">—</div>
+    </div>
+
+    <button class="btn btn-ghost" onclick="loadHealth()" style="margin-bottom:16px;">↻ Refresh</button>
+
+    <div class="loading" id="health-loading">
+      <div class="spinner"></div>
+      <span>Checking components…</span>
+    </div>
+    <div class="error-box" id="health-error"></div>
+
+    <div class="health-grid" id="health-grid"></div>
+  </div>
+
+  <!-- ── Analytics Panel ───────────────────── -->
+  <div class="panel" id="panel-analytics">
+    <div class="panel-header">
+      <div class="panel-title">Analytics</div>
+      <div class="panel-sub">Query performance and hallucination risk distribution</div>
+    </div>
+
+    <div style="display:flex; gap:8px; align-items:flex-end; margin-bottom:20px;">
+      <div class="field" style="margin-bottom:0; width:160px;">
+        <label>Window (minutes)</label>
+        <input type="number" id="analytics-window" value="60" min="1" max="10080" />
+      </div>
+      <button class="btn btn-ghost" onclick="loadAnalytics()">↻ Load</button>
+    </div>
+
+    <div class="loading" id="analytics-loading">
+      <div class="spinner"></div>
+      <span>Fetching analytics…</span>
+    </div>
+    <div class="error-box" id="analytics-error"></div>
+
+    <div id="analytics-content" style="display:none">
+      <div class="analytics-grid">
+        <div class="metric-card"><div class="metric-val" id="an-queries">—</div><div class="metric-lbl">Total Queries</div></div>
+        <div class="metric-card"><div class="metric-val" id="an-conf">—</div><div class="metric-lbl">Avg Confidence</div></div>
+        <div class="metric-card"><div class="metric-val" id="an-latency">—</div><div class="metric-lbl">Avg Latency ms</div></div>
+        <div class="metric-card"><div class="metric-val" id="an-cache">—</div><div class="metric-lbl">Cache Hit Rate</div></div>
+      </div>
+
+      <div class="risk-bar-section">
+        <div class="claims-title" style="margin-bottom:12px;">Risk Distribution</div>
+        <div class="risk-row">
+          <div class="risk-label">LOW</div>
+          <div class="risk-track"><div class="risk-fill" id="risk-low" style="background:var(--green); width:0%"></div></div>
+          <div class="risk-count" id="risk-low-n">0</div>
+        </div>
+        <div class="risk-row">
+          <div class="risk-label">MEDIUM</div>
+          <div class="risk-track"><div class="risk-fill" id="risk-med" style="background:var(--yellow); width:0%"></div></div>
+          <div class="risk-count" id="risk-med-n">0</div>
+        </div>
+        <div class="risk-row">
+          <div class="risk-label">HIGH</div>
+          <div class="risk-track"><div class="risk-fill" id="risk-high" style="background:var(--red); width:0%"></div></div>
+          <div class="risk-count" id="risk-high-n">0</div>
+        </div>
+      </div>
+
+      <div class="sources-section">
+        <div class="claims-title" style="margin-bottom:0;">Top Sources</div>
+        <div id="analytics-sources"></div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<script>
+// ── Utilities ─────────────────────────────────────────
+
+const $ = id => document.getElementById(id);
+const base = () => ($('base-url').value || 'http://localhost:8000').replace(/\/$/, '');
+
+function show(el, cls='visible') { el.classList.add(cls); }
+function hide(el, cls='visible') { el.classList.remove(cls); }
+function setLoading(id, on) {
+  const el = $(id+'-loading');
+  if(el) on ? show(el) : hide(el);
+}
+function setError(id, msg) {
+  const el = $(id+'-error');
+  if(!el) return;
+  if(msg) { el.textContent = msg; show(el); }
+  else hide(el);
+}
+
+async function apiFetch(path, opts={}) {
+  const r = await fetch(base() + path, opts);
+  if(!r.ok) {
+    let detail;
+    try { detail = (await r.json()).detail; } catch { detail = r.statusText; }
+    throw new Error(detail || `HTTP ${r.status}`);
+  }
+  return r.json();
+}
+
+// ── Nav ───────────────────────────────────────────────
+
+function switchPanel(el) {
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  el.classList.add('active');
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  $('panel-' + el.dataset.panel).classList.add('active');
+
+  // Auto-load panels
+  if(el.dataset.panel === 'health') loadHealth();
+  if(el.dataset.panel === 'analytics') loadAnalytics();
+}
+
+// ── Status Pill ───────────────────────────────────────
+
+async function checkStatus() {
+  try {
+    const d = await apiFetch('/health');
+    const pill = $('status-pill');
+    pill.className = '';
+    pill.classList.add(d.status || 'unhealthy');
+    $('status-text').textContent = d.status || 'unknown';
+  } catch {
+    $('status-pill').className = 'unhealthy';
+    $('status-text').textContent = 'offline';
+  }
+}
+
+// ── Query ─────────────────────────────────────────────
+
+async function runQuery() {
+  const q = $('query-text').value.trim();
+  if(!q) return;
+
+  const btn = $('query-btn');
+  btn.disabled = true;
+  setError('query', null);
+  hide($('query-result'));
+  setLoading('query', true);
+
+  try {
+    const body = {
+      query: q,
+      max_tokens: parseInt($('query-tokens').value) || 1024,
+      top_k: parseInt($('query-topk').value) || 5,
+      min_score: parseFloat($('query-minscore').value) || 0.0,
+    };
+
+    const d = await apiFetch('/query', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
+    renderQueryResult(d);
+  } catch(e) {
+    setError('query', e.message);
+  } finally {
+    setLoading('query', false);
+    btn.disabled = false;
+  }
+}
+
+function renderQueryResult(d) {
+  const risk = (d.hallucination_risk || 'MEDIUM').toUpperCase();
+  $('res-risk').textContent = risk;
+  $('res-risk').className = 'response-tag ' + (risk==='LOW'?'tag-low': risk==='HIGH'?'tag-high':'tag-med');
+  $('res-provider').textContent = d.provider || d.model || 'unknown';
+  $('res-latency').textContent = d.latency_ms ? `${Math.round(d.latency_ms)}ms` : '';
+  $('res-answer').textContent = d.answer || d.response || JSON.stringify(d);
+
+  const conf = d.confidence?.final ?? d.confidence ?? null;
+  $('st-conf').textContent  = conf !== null ? conf.toFixed(2) : '—';
+  $('st-chunks').textContent   = d.reranked_chunks?.length ?? d.chunks?.length ?? '—';
+  $('st-claims').textContent   = d.claims?.length ?? '—';
+  $('st-supported').textContent = d.claims ? d.claims.filter(c=>c.supported).length : '—';
+
+  // Claims
+  const cl = $('claims-list');
+  cl.innerHTML = '';
+  if(d.claims?.length) {
+    d.claims.forEach(c => {
+      const div = document.createElement('div');
+      div.className = 'claim ' + (c.supported ? 'supported' : 'unsupported');
+      div.innerHTML = `<span class="claim-icon">${c.supported ? '✓' : '✗'}</span><span class="claim-text">${escHtml(c.claim || c.text || '')}</span>`;
+      cl.appendChild(div);
+    });
+    show($('claims-section'), 'block'); $('claims-section').style.display='block';
+  } else {
+    $('claims-section').style.display='none';
+  }
+
+  // Chunks
+  const chl = $('chunks-list');
+  chl.innerHTML = '';
+  const chunks = d.reranked_chunks || d.chunks || [];
+  chunks.forEach((ch, i) => {
+    const c = ch.chunk || ch;
+    const div = document.createElement('div');
+    div.className = 'chunk';
+    div.innerHTML = `
+      <div class="chunk-meta">
+        <span>#${i+1}</span>
+        ${c.source ? `<span>${escHtml(c.source)}</span>` : ''}
+        ${ch.score !== undefined ? `<span>score ${ch.score.toFixed(3)}</span>` : ''}
+      </div>
+      <div class="chunk-text">${escHtml((c.text || c.content || '').slice(0, 300))}${(c.text||'').length>300?'…':''}</div>`;
+    chl.appendChild(div);
+  });
+
+  show($('query-result'));
+}
+
+function clearQuery() {
+  $('query-text').value = '';
+  hide($('query-result'));
+  setError('query', null);
+}
+
+// ── Ingest Text ───────────────────────────────────────
+
+async function ingestText() {
+  const content = $('ingest-content').value.trim();
+  if(!content) return;
+
+  const btn = $('ingest-text-btn');
+  btn.disabled = true;
+  setError('ingest-text', null);
+  hide($('ingest-text-result'));
+  setLoading('ingest-text', true);
+
+  try {
+    const body = { content };
+    if($('ingest-doc-id').value.trim()) body.document_id = $('ingest-doc-id').value.trim();
+    if($('ingest-source').value.trim())  body.source       = $('ingest-source').value.trim();
+
+    const d = await apiFetch('/ingest_text', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
+    const r = $('ingest-text-result');
+    r.innerHTML = `✓ Indexed <strong>${d.chunks_created ?? d.num_chunks ?? '?'}</strong> chunks &nbsp;·&nbsp; doc_id: <code>${escHtml(d.document_id || '')}</code>`;
+    show(r);
+  } catch(e) {
+    setError('ingest-text', e.message);
+  } finally {
+    setLoading('ingest-text', false);
+    btn.disabled = false;
+  }
+}
+
+// ── Ingest File ───────────────────────────────────────
+
+let _selectedFile = null;
+
+function fileSelected(input) {
+  _selectedFile = input.files[0] || null;
+  updateFileDrop();
+}
+function fileDragOver(e) { e.preventDefault(); $('file-drop').classList.add('drag'); }
+function fileDragLeave()  { $('file-drop').classList.remove('drag'); }
+function fileDrop(e) {
+  e.preventDefault();
+  $('file-drop').classList.remove('drag');
+  _selectedFile = e.dataTransfer.files[0] || null;
+  updateFileDrop();
+}
+function updateFileDrop() {
+  $('file-drop-text').textContent = _selectedFile ? _selectedFile.name : 'Drop file here or click to browse';
+  $('ingest-file-btn').disabled = !_selectedFile;
+}
+
+async function ingestFile() {
+  if(!_selectedFile) return;
+  const btn = $('ingest-file-btn');
+  btn.disabled = true;
+  setError('ingest-file', null);
+  hide($('ingest-file-result'));
+  setLoading('ingest-file', true);
+
+  try {
+    const fd = new FormData();
+    fd.append('file', _selectedFile);
+    const d = await apiFetch('/ingest_file', { method: 'POST', body: fd });
+
+    const r = $('ingest-file-result');
+    r.innerHTML = `✓ Indexed <strong>${d.chunks_created ?? d.num_chunks ?? '?'}</strong> chunks &nbsp;·&nbsp; doc_id: <code>${escHtml(d.document_id || '')}</code>`;
+    show(r);
+    _selectedFile = null;
+    $('file-input').value = '';
+    updateFileDrop();
+  } catch(e) {
+    setError('ingest-file', e.message);
+  } finally {
+    setLoading('ingest-file', false);
+    btn.disabled = false;
+  }
+}
+
+// ── Delete ────────────────────────────────────────────
+
+async function deleteDoc() {
+  const id = $('delete-doc-id').value.trim();
+  if(!id) return;
+  setLoading('delete', true);
+
+  const r = $('delete-result');
+  r.className = 'delete-result';
+
+  try {
+    const d = await apiFetch(`/documents/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    r.textContent = `✓ Removed ${d.chunks_removed} chunk(s) for document ${id}`;
+    r.classList.add('ok');
+  } catch(e) {
+    r.textContent = `✗ ${e.message}`;
+    r.classList.add('err');
+  } finally {
+    setLoading('delete', false);
+  }
+}
+
+// ── Health ────────────────────────────────────────────
+
+async function loadHealth() {
+  setLoading('health', true);
+  setError('health', null);
+  $('health-grid').innerHTML = '';
+  $('health-summary').style.display = 'none';
+
+  try {
+    const d = await apiFetch('/health');
+    const statusColor = { healthy: '#5a8a6a', degraded: '#8a7a4a', unhealthy: '#8a4a4a' };
+    const col = statusColor[d.status] || '#666';
+
+    $('health-summary').style.display = 'flex';
+    $('health-big-dot').style.background = col;
+    $('health-big-dot').style.boxShadow = `0 0 8px ${col}`;
+    $('health-big-status').textContent = d.status || '—';
+    $('health-uptime').textContent = d.uptime_s !== undefined ? `uptime ${d.uptime_s}s` : '';
+
+    const grid = $('health-grid');
+    (d.components || []).forEach(c => {
+      const card = document.createElement('div');
+      card.className = 'health-card';
+      const dot = c.healthy ? '#5a8a6a' : '#8a4a4a';
+      card.innerHTML = `
+        <div class="health-card-name">${escHtml(c.name)}</div>
+        <div class="health-status">
+          <div class="health-dot" style="background:${dot}; box-shadow:0 0 5px ${dot}"></div>
+          <span>${c.healthy ? 'healthy' : 'unhealthy'}</span>
+        </div>
+        ${c.detail    ? `<div class="health-detail">${escHtml(c.detail)}</div>` : ''}
+        ${c.latency_ms!==undefined ? `<div class="health-latency">${c.latency_ms}ms</div>` : ''}`;
+      grid.appendChild(card);
+    });
+
+    // Update header pill too
+    const pill = $('status-pill');
+    pill.className = d.status || 'unhealthy';
+    $('status-text').textContent = d.status || 'unknown';
+  } catch(e) {
+    setError('health', e.message);
+  } finally {
+    setLoading('health', false);
+  }
+}
+
+// ── Analytics ─────────────────────────────────────────
+
+async function loadAnalytics() {
+  const w = $('analytics-window').value || 60;
+  setLoading('analytics', true);
+  setError('analytics', null);
+  $('analytics-content').style.display = 'none';
+
+  try {
+    const d = await apiFetch(`/analytics?window_minutes=${w}`);
+
+    $('an-queries').textContent  = d.total_queries ?? '—';
+    $('an-conf').textContent     = d.avg_confidence !== undefined ? d.avg_confidence.toFixed(2) : '—';
+    $('an-latency').textContent  = d.avg_latency_ms !== undefined ? Math.round(d.avg_latency_ms) : '—';
+    $('an-cache').textContent    = d.cache_hit_rate !== undefined ? (d.cache_hit_rate*100).toFixed(0)+'%' : '—';
+
+    const risk = d.risk_distribution || {};
+    const total = Math.max((risk.LOW||0)+(risk.MEDIUM||0)+(risk.HIGH||0), 1);
+    const setPct = (id, n) => { $(id).style.width = (n/total*100)+'%'; };
+    setPct('risk-low',  risk.LOW  ||0); $('risk-low-n').textContent  = risk.LOW  ||0;
+    setPct('risk-med',  risk.MEDIUM||0); $('risk-med-n').textContent = risk.MEDIUM||0;
+    setPct('risk-high', risk.HIGH ||0); $('risk-high-n').textContent = risk.HIGH  ||0;
+
+    const src = $('analytics-sources');
+    src.innerHTML = '';
+    (d.top_sources || []).slice(0,8).forEach(s => {
+      const row = document.createElement('div');
+      row.className = 'source-row';
+      row.innerHTML = `<span class="source-name">${escHtml(s.source)}</span><span class="source-count">${s.count}</span>`;
+      src.appendChild(row);
+    });
+    if(!d.top_sources?.length) src.innerHTML = '<div style="padding:12px; color:var(--text-dim); font-size:12px;">No data yet</div>';
+
+    $('analytics-content').style.display = 'block';
+  } catch(e) {
+    setError('analytics', e.message);
+  } finally {
+    setLoading('analytics', false);
+  }
+}
+
+// ── Helpers ───────────────────────────────────────────
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── Init ──────────────────────────────────────────────
+
+checkStatus();
+setInterval(checkStatus, 30000);
+</script>
+</body>
+</html>

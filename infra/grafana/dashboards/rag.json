@@ -1,0 +1,54 @@
+{
+  "title": "Multiagent RAG — Pipeline Metrics",
+  "uid": "multiagent-rag-v1",
+  "panels": [
+    {
+      "title": "Query Rate",
+      "type": "stat",
+      "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0},
+      "targets": [{
+        "expr": "rate(rag_queries_total[5m])",
+        "legendFormat": "queries/sec"
+      }]
+    },
+    {
+      "title": "Avg Latency (ms)",
+      "type": "stat",
+      "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0},
+      "targets": [{
+        "expr": "avg(rag_query_latency_ms)",
+        "legendFormat": "ms"
+      }]
+    },
+    {
+      "title": "Hallucination Risk Distribution",
+      "type": "piechart",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4},
+      "targets": [
+        {"expr": "rag_risk_low_total",    "legendFormat": "LOW"},
+        {"expr": "rag_risk_medium_total", "legendFormat": "MEDIUM"},
+        {"expr": "rag_risk_high_total",   "legendFormat": "HIGH"}
+      ]
+    },
+    {
+      "title": "Cache Hit Rate",
+      "type": "gauge",
+      "gridPos": {"h": 8, "w": 6, "x": 12, "y": 4},
+      "targets": [{
+        "expr": "rate(rag_cache_hits_total[5m]) / rate(rag_queries_total[5m])",
+        "legendFormat": "hit rate"
+      }]
+    },
+    {
+      "title": "Latency Over Time",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 12},
+      "targets": [{
+        "expr": "rag_query_latency_ms",
+        "legendFormat": "latency ms"
+      }]
+    }
+  ],
+  "schemaVersion": 36,
+  "version": 1
+}

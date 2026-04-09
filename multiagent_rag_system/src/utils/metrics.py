@@ -5,10 +5,10 @@ from typing import Callable
 
 from ..utils.config_loader import get_settings
 from ..exception.custom_exception import MulitagentragException
-from ..logger import GLOBAL_LOGGER
+from ..logger import GLOBAL_LOGGER as logger
 
 settings = get_settings()
-config = settings.observability
+config = settings.observability.otel
 
 ## setting up prometheus
 try:

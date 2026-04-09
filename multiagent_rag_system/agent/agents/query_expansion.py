@@ -10,6 +10,8 @@ from __future__ import annotations
 import asyncio
 from typing import Optional
 from groq import AsyncGroq
+import httpx
+from langsmith import traceable
 
 from multiagent_rag_system.src.utils.config_loader import get_settings
 from multiagent_rag_system.src.logger import GLOBAL_LOGGER as logger
@@ -28,14 +30,19 @@ class QueryExpansionAgent:
 
     def _client(self) -> AsyncGroq:
         if self._groqai is None:
-            self._groqai = AsyncGroq(api_key =self.api_key)
+            # Configure timeout using httpx.Timeout
+            timeout = httpx.Timeout(self.config.timeout_seconds)
+            self._groqai = AsyncGroq(api_key=self.api_key, timeout=timeout)
         return self._groqai
 
+    @traceable(name="Query Expansion Agent")
     async def expand(self, query: QueryRequest) -> tuple[list[str], Optional[str]]:
         """
         Returns:
           expanded_queries — list of strings for the retriever
           hyde_doc — hypothetical answer text (or None)
+        
+        If expansion fails, gracefully returns the original query.
         """
         try:
             if not self.config.enabled:
@@ -56,9 +63,19 @@ class QueryExpansionAgent:
                 )
                 return [query.query, hyde_doc] + variants, hyde_doc
             
+        except asyncio.TimeoutError as e:
+            logger.info(
+                f"Query expansion timed out after {self.config.timeout_seconds}s, "
+                "using original query",
+                error=str(e)
+            )
+            return [query.query], None
         except Exception as e:
-            logger.error("Failed to load the expansion model", error = str(e))
-            raise MulitagentragException("failed to load teh expansion model", error_details = str(e))
+            logger.info(
+                f"Query expansion failed, using original query as fallback",
+                error=str(e)
+            )
+            return [query.query], None
         
     async def _hyde(self, query: str) -> str:
         """

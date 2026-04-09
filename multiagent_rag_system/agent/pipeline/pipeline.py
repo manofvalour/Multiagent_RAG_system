@@ -24,6 +24,7 @@ from multiagent_rag_system.src.exception.custom_exception import MulitagentragEx
 from multiagent_rag_system.src.models.models import (
     AgentEvent, QueryRequest, QueryResponse, 
     HallucinationRisk, ConfidenceBreakdown)
+from langsmith import traceable
 
 from multiagent_rag_system.src.cache.cache import SemanticCache
 

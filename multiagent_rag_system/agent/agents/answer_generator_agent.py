@@ -3,6 +3,7 @@ import asyncio
 import time
 from typing import Optional
 import numpy as np
+from langsmith import traceable
 
 from ...src.utils.config_loader import get_settings
 from ...src.logger import GLOBAL_LOGGER
@@ -40,6 +41,7 @@ class AnswerGeneratorAgent:
         self.agent_id = agent_id
         self.agent_name = f"{self.NAME}-{agent_id}"
 
+    @traceable(name="Answer Generator Agent")
     async def run(self,
             query:str, chunks:list[RerankedChunk], 
             temperature: Optional[float]=None,

@@ -13,6 +13,7 @@ from typing import Optional
 from fastapi import FastAPI, HTTPException, Request, Response, Depends, Header, status, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, PlainTextResponse, FileResponse
+from multiagent_rag_system.src.observability.observability import setup_observability
 
 import structlog
 import os
@@ -54,6 +55,8 @@ async def lifespan(app: FastAPI):
     _start_time = time.perf_counter()
     logger.info("startup", env=settings.environment, version=settings.app_version)
 
+    setup_observability()  # Configures both OpenTelemetry and LangSmith based on settings
+
     # Warm up embedder and vector store
     await get_embedder()
     await get_vector_store()
@@ -71,7 +74,7 @@ async def lifespan(app: FastAPI):
         # Give any pending tasks a short window to complete
         await asyncio.sleep(0.5)
     except Exception as e:
-        logger.warning("shutdown_cleanup_error", error=str(e))
+        logger.error("shutdown_cleanup_error", error=str(e))
     
     logger.info("shutdown")
 
@@ -174,7 +177,7 @@ async def ingest_file(file: UploadFile = File(...)):
     # Read file bytes
     file_content = await file.read()
     
-    # Ingest the file — DocumentIngestionPipeline handles saving to disk internally
+    # Ingest the file
     result = await _ingestion.ingest_file(content=file_content, filename=file.filename)
     record_ingestion()
     store = await get_vector_store()
@@ -203,16 +206,16 @@ async def health():
     try:
         store = await get_vector_store()
         count = await store.count()
-        components.append(HealthComponent(name="vector_store", healthy=True, detail=f"{count} chunks"))
+        components.append(HealthComponent(name="Vector_Store", healthy=True, detail=f"{count} chunks"))
     except Exception as e:
-        components.append(HealthComponent(name="vector_store", healthy=False, detail=str(e)))
+        components.append(HealthComponent(name="Vector_Store", healthy=False, detail=str(e)))
 
     # Redis
     try:
         lat = await _cache.ping()
-        components.append(HealthComponent(name="redis", healthy=True, latency_ms=round(lat, 2)))
+        components.append(HealthComponent(name="Redis", healthy=True, latency_ms=round(lat, 2)))
     except Exception as e:
-        components.append(HealthComponent(name="redis", healthy=False, detail=str(e)))
+        components.append(HealthComponent(name="Redis", healthy=False, detail=str(e)))
 
     # LLM
     try:
@@ -290,4 +293,5 @@ async def root():
         "version": settings.app_version,
         "docs": "/docs",
         "health": "/health",
+        "ui": "/ui"
     }

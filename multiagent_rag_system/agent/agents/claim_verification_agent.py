@@ -4,6 +4,7 @@ import re
 import time
 from typing import Optional
 import sys
+from langsmith import traceable
 
 from multiagent_rag_system.src.utils.config_loader import get_settings
 from multiagent_rag_system.src.logger import GLOBAL_LOGGER as logger
@@ -64,6 +65,7 @@ class ClaimVerificationAgent:
     async def _lexical_async(self, claim: str, chunks: list[RerankedChunk]):
         return self._verify_lexical(claim, chunks)
     
+    @traceable(name ="Claim Verification Agent")
     async def run(
             self, answer: str, chunks: list[RerankedChunk]
     ) -> tuple[list[Claim], AgentEvent]:
