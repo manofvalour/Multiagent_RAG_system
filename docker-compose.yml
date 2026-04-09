@@ -33,8 +33,7 @@ services:
       context: .
       dockerfile: backend/Dockerfile
     container_name: rag_api
-    # Port exposed for direct access during development only.
-    # In production, all traffic routes through nginx — remove this port mapping.
+  
     ports:
       - "8000:8000"
     environment:
@@ -82,8 +81,7 @@ services:
       context: .
       dockerfile: frontend/Dockerfile
     container_name: rag_frontend
-    # Port exposed for direct access during development only.
-    # In production, traffic routes through nginx — remove this port mapping.
+    
     ports:
       - "3000:80"   # host:container — nginx inside container listens on 80
     depends_on:
@@ -91,7 +89,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      # Frontend is nginx serving static files — healthcheck on port 80 not 3000
+    
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80"]
       interval: 30s
       timeout: 5s
@@ -103,7 +101,7 @@ services:
   qdrant:
     image: qdrant/qdrant:latest
     container_name: rag_qdrant
-    # Remove this port mapping in production — api connects via internal network
+    
     ports:
       - "6333:6333"
     environment:
@@ -132,7 +130,7 @@ services:
       --loglevel warning
     volumes:
       - redis_data:/data
-    # Remove this port mapping in production
+
     ports:
       - "6379:6379"
     restart: unless-stopped
@@ -173,8 +171,8 @@ services:
     ports:
       - "3001:3000"
     environment:
-      GF_SECURITY_ADMIN_USER:     ${GRAFANA_ADMIN_USER:-admin}
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_SECURITY_ADMIN_USER:     ${GRAFANA_ADMIN_USER}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
       GF_INSTALL_PLUGINS:         "grafana-piechart-panel"
       GF_PATHS_PROVISIONING:      /etc/grafana/provisioning
       GF_USERS_ALLOW_SIGN_UP:     "false"
@@ -193,27 +191,6 @@ services:
       retries: 3
     networks:
       - rag_network
-
-  # ── Jaeger (OTel trace backend) ───────────────────────────────────────────
-  # Optional — only needed if OTEL_ENABLED=true.
-  # Remove this service if using a cloud OTel backend (Honeycomb, Grafana Cloud).
-  #jaeger:
-   # image: jaegertracing/all-in-one:latest
-    #container_name: rag_jaeger
- #   ports:
-  #    - "16686:16686"   # Jaeger UI — open localhost:16686 to view traces
-   #   - "4317:4317"     # OTLP gRPC endpoint — set OTEL_EXPORTER_OTLP_ENDPOINT to this
-    #  - "4318:4318"     # OTLP HTTP endpoint
- #   environment:
-  #    COLLECTOR_OTLP_ENABLED: "true"
-   # restart: unless-stopped
- #   healthcheck:
-  #    test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:16686"]
-   #   interval: 30s
-    #  timeout: 5s
-  #    retries: 3
- #   networks:
-  #    - rag_network
 
 networks:
   rag_network:
