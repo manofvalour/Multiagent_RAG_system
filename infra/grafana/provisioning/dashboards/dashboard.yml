@@ -4,5 +4,9 @@ providers:
   - name: multiagent-rag
     folder: RAGSystem
     type: file
+    disableDeletion: false
+    editable: true
     options:
       path: /var/lib/grafana/dashboards
+
+      #/etc/grafana/dashboards

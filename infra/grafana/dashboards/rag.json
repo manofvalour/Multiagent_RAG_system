@@ -1,54 +1,142 @@
 {
-  "title": "Multiagent RAG — Pipeline Metrics",
-  "uid": "multiagent-rag-v1",
+  "title": "RAG System Dashboard",
+  "uid": "rag-system",
+  "version": 1,
+  "refresh": "10s",
   "panels": [
     {
-      "title": "Query Rate",
+      "id": 1,
+      "title": "Total Queries",
       "type": "stat",
-      "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0},
+      "gridPos": {"x": 0, "y": 0, "w": 6, "h": 4},
       "targets": [{
-        "expr": "rate(rag_queries_total[5m])",
-        "legendFormat": "queries/sec"
-      }]
+        "expr": "rag_queries_total",
+        "legendFormat": "Queries"
+      }],
+      "datasource": "Prometheus"
     },
     {
-      "title": "Avg Latency (ms)",
+      "id": 2,
+      "title": "Active Requests",
       "type": "stat",
-      "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0},
+      "gridPos": {"x": 6, "y": 0, "w": 6, "h": 4},
       "targets": [{
-        "expr": "avg(rag_query_latency_ms)",
-        "legendFormat": "ms"
-      }]
+        "expr": "rag_active_reqests",
+        "legendFormat": "Active"
+      }],
+      "datasource": "Prometheus"
     },
     {
-      "title": "Hallucination Risk Distribution",
-      "type": "piechart",
-      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4},
-      "targets": [
-        {"expr": "rag_risk_low_total",    "legendFormat": "LOW"},
-        {"expr": "rag_risk_medium_total", "legendFormat": "MEDIUM"},
-        {"expr": "rag_risk_high_total",   "legendFormat": "HIGH"}
-      ]
-    },
-    {
-      "title": "Cache Hit Rate",
-      "type": "gauge",
-      "gridPos": {"h": 8, "w": 6, "x": 12, "y": 4},
+      "id": 3,
+      "title": "Documents Ingested",
+      "type": "stat",
+      "gridPos": {"x": 12, "y": 0, "w": 6, "h": 4},
       "targets": [{
-        "expr": "rate(rag_cache_hits_total[5m]) / rate(rag_queries_total[5m])",
-        "legendFormat": "hit rate"
-      }]
+        "expr": "rag_ingestion_total",
+        "legendFormat": "Ingested"
+      }],
+      "datasource": "Prometheus"
     },
     {
-      "title": "Latency Over Time",
+      "id": 4,
+      "title": "Vector Store Chunks",
+      "type": "stat",
+      "gridPos": {"x": 18, "y": 0, "w": 6, "h": 4},
+      "targets": [{
+        "expr": "rag_vector_store_chunks",
+        "legendFormat": "Chunks"
+      }],
+      "datasource": "Prometheus"
+    },
+    {
+      "id": 5,
+      "title": "Query Rate (per minute)",
       "type": "timeseries",
-      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 12},
+      "gridPos": {"x": 0, "y": 4, "w": 12, "h": 8},
       "targets": [{
-        "expr": "rag_query_latency_ms",
-        "legendFormat": "latency ms"
-      }]
+        "expr": "rate(rag_queries_total[1m]) * 60",
+        "legendFormat": "Queries/min"
+      }],
+      "datasource": "Prometheus"
+    },
+    {
+      "id": 6,
+      "title": "Query Latency (p50 / p95 / p99)",
+      "type": "timeseries",
+      "gridPos": {"x": 12, "y": 4, "w": 12, "h": 8},
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, rate(rag_query_latency_ms_bucket[5m]))",
+          "legendFormat": "p50"
+        },
+        {
+          "expr": "histogram_quantile(0.95, rate(rag_query_latency_ms_bucket[5m]))",
+          "legendFormat": "p95"
+        },
+        {
+          "expr": "histogram_quantile(0.99, rate(rag_query_latency_ms_bucket[5m]))",
+          "legendFormat": "p99"
+        }
+      ],
+      "datasource": "Prometheus"
+    },
+    {
+      "id": 7,
+      "title": "Confidence Score Distribution (p50 / p95)",
+      "type": "timeseries",
+      "gridPos": {"x": 0, "y": 12, "w": 12, "h": 8},
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, rate(rag_confidence_score_bucket[5m]))",
+          "legendFormat": "p50"
+        },
+        {
+          "expr": "histogram_quantile(0.95, rate(rag_confidence_score_bucket[5m]))",
+          "legendFormat": "p95"
+        }
+      ],
+      "datasource": "Prometheus"
+    },
+    {
+      "id": 8,
+      "title": "Chunks Retrieved per Query (p50 / p95)",
+      "type": "timeseries",
+      "gridPos": {"x": 12, "y": 12, "w": 12, "h": 8},
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, rate(rag_chunks_retrieved_bucket[5m]))",
+          "legendFormat": "p50"
+        },
+        {
+          "expr": "histogram_quantile(0.95, rate(rag_chunks_retrieved_bucket[5m]))",
+          "legendFormat": "p95"
+        }
+      ],
+      "datasource": "Prometheus"
+    },
+    {
+      "id": 9,
+      "title": "Claims Verified Rate",
+      "type": "timeseries",
+      "gridPos": {"x": 0, "y": 20, "w": 12, "h": 8},
+      "targets": [{
+        "expr": "rate(rag_claim_verified_total[1m]) * 60",
+        "legendFormat": "Claims/min"
+      }],
+      "datasource": "Prometheus"
+    },
+    {
+      "id": 10,
+      "title": "Avg Query Latency (ms)",
+      "type": "timeseries",
+      "gridPos": {"x": 12, "y": 20, "w": 12, "h": 8},
+      "targets": [{
+        "expr": "rate(rag_query_latency_ms_sum[5m]) / rate(rag_query_latency_ms_count[5m])",
+        "legendFormat": "Avg Latency ms"
+      }],
+      "datasource": "Prometheus"
     }
   ],
   "schemaVersion": 36,
-  "version": 1
+  "time": {"from": "now-1h", "to": "now"}
 }

@@ -523,7 +523,7 @@
 <!-- Header -->
 <header>
   <div class="logo">
-    RAG <span class="logo-badge">7-Agent</span>
+    RAG <span class="logo-badge">Pipeline</span>
   </div>
   <div id="status-pill" onclick="loadHealth()" title="Click to refresh health">
     <span class="dot"></span>
@@ -561,7 +561,7 @@
     <div class="nav-label">Settings</div>
     <div class="field" style="padding: 0 4px;">
       <label>Base URL</label>
-      <input type="text" id="base-url" value="http://localhost:8000" placeholder="http://localhost:8000" />
+      <input type="text" id="base-url" value="http://localhost/api" placeholder="http://localhost:8000" />
     </div>
   </div>
 </aside>
@@ -573,7 +573,7 @@
   <div class="panel active" id="panel-query">
     <div class="panel-header">
       <div class="panel-title">Query</div>
-      <div class="panel-sub">Run the full 7-agent hallucination reduction pipeline</div>
+      <div class="panel-sub">Run the 7-agent hallucination reduction pipeline</div>
     </div>
 
     <div class="field">
@@ -812,7 +812,7 @@
 // ── Utilities ─────────────────────────────────────────
 
 const $ = id => document.getElementById(id);
-const base = () => ($('base-url').value || 'http://localhost:8000').replace(/\/$/, '');
+const base = () => ($('base-url').value || 'http://localhost/api').replace(/\/$/, '');
 
 function show(el, cls='visible') { el.classList.add(cls); }
 function hide(el, cls='visible') { el.classList.remove(cls); }

@@ -20,7 +20,8 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/health"]
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:80/health || exit 1"]
+      #test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/health || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -60,18 +61,20 @@ services:
     volumes:
       - rag_data:/app/data
       - ./logs:/app/logs
+      - hf_cache:/root/.cache/huggingface
     depends_on:
       redis:
         condition: service_healthy
       qdrant:
         condition: service_healthy
     restart: unless-stopped
+    
     healthcheck:
-      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8000/health', timeout=5)"]
+      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8000/health', timeout=10)"]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 40s
+      retries: 5
+      start_period: 180s
     networks:
       - rag_network
 
@@ -89,11 +92,12 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-    
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/health || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3
+      start_period: 10s
+  
     networks:
       - rag_network
 
@@ -109,11 +113,14 @@ services:
     volumes:
       - qdrant_data:/qdrant/storage
     restart: unless-stopped
+
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:6333/collections"]
-      interval: 30s
+      test: ["CMD", "bash", "-c", "echo > /dev/tcp/localhost/6333"]
+      interval: 10s
       timeout: 5s
-      retries: 3
+      retries: 5
+      start_period: 15s
+
     networks:
       - rag_network
 
@@ -139,6 +146,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+      start_period: 20s
     networks:
       - rag_network
 
@@ -157,7 +165,7 @@ services:
       - "--storage.tsdb.retention.time=7d"
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:9090/-/healthy || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -185,7 +193,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:3000/api/health || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -197,6 +205,7 @@ networks:
     driver: bridge
 
 volumes:
+  hf_cache:
   rag_data:
     driver: local
   redis_data:

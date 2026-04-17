@@ -100,8 +100,10 @@ class LLMProviderConfig(BaseModel):
 class RerankerConfig(BaseModel):
     """Cross-encoder reranking stage."""
     enabled: bool = True
-    top_n:int = 5
-    model:str = "BAAI/bge-reranker-v2-m3"
+    top_n:int = 3
+    model:str = "jinaai/jina-reranker-v3"
+    #"cross-encoder/ms-marco-MiniLM-L-6-v2"
+    #"BAAI/bge-reranker-v2-m3"
 
 
 class QueryExpansionConfig(BaseModel):
@@ -254,7 +256,7 @@ class EvaluationConfig(BaseModel):
 
 class AgentConfig(BaseModel):
     """Multi-agent pipeline thresholds."""
-    consensus_n_agents:int = 5
+    consensus_n_agents:int = 3
     retrieval_relevance_threshold: float = 0.12
     claim_support_threshold: float = 0.20
     confidence_low_threshold: float = 0.70
@@ -310,7 +312,7 @@ class Settings(BaseSettings):
     langsmith_api_key: SecretStr = Field(default="", alias="LANGSMITH_API_KEY")
     qdrant_endpoint: SecretStr = Field(default="", alias = "QDRANT_ENDPOINT")
     redis_url: str = Field(default="redis://localhost:6379/0", alias="REDIS_URL")
-    jwt_secret:SecretStr = Field(default="", alias="JWT_SECRET")
+    #jwt_secret:SecretStr = Field(default="", alias="JWT_SECRET")
 
     # ── LLM provider registry ──────────────────────────────────────────────
     # active_provider selects which entry in llm_providers is used at runtime.

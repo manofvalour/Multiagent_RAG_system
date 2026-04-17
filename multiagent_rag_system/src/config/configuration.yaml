@@ -1,4 +1,4 @@
-app:
+arapp:
   app_name: "MultiAgentRAG"
   app_version: "1.0.0"
   debug: false
@@ -12,16 +12,11 @@ server:
     - "http://localhost:3000"
     - "http://localhost:5173"
 
-database:
-  database_url: "postgresql+asyncpg://rag:rag@localhost:5432/ragdb"
-  db_pool_size: 10
-  db_max_overflow: 20
-  db_pool_timeout: 30
 
 reranker:
   enabled: True
   top_n: 5                      # chunks kept after reranking
-  model: "BAAI/bge-reranker-v2-m3"
+  model: "jinaai/jina-reranker-v3"
 
 chunker:
     chunking_strategy: "hybrid"        # hybrid | recursive | sentence
@@ -32,14 +27,9 @@ chunker:
 redis:
   redis_url: 'redis://localhost:6379/0'
   cache_ttl_seconds: 3600
-  session_ttl_second: 86400
+  session_ttl_seconds: 86400
   enabled: true
   similarity_threshold: 0.92    # reuse cached answer if query is ≥92% similar
-
-auth:
-  jwt_algorithm: "HS256"
-  jwt_expire_minutes: 60
-  api_key_header: "X-API-Key"
 
 llm:
   active_providers: 'groq'
@@ -80,7 +70,7 @@ vector_store:
 
 
 agents_info:
-  consensus_n_agents: 5
+  consensus_n_agents: 3
   retrieval_relevance_threshold: 0.12
   claim_support_threshold: 0.20
   confidence_low_threshold: 0.65

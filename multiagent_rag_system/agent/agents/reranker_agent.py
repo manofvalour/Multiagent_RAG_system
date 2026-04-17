@@ -26,8 +26,11 @@ class RerankerAgent:
  
     def _load(self) -> None:
         if self._model is None:
-            from sentence_transformers import CrossEncoder
-            self._model = CrossEncoder(self.config.model)
+           # from sentence_transformers import CrossEncoder
+            from transformers import AutoModel
+            #self._model = CrossEncoder(self.config.model)
+            self._model = AutoModel.from_pretrained(self.config.model, dtype="auto",
+                                                    trust_remote_code=True,)
             logger.info(f"CrossEncoder loaded: {self.config.model}")
  
     @traceable(name = "Reranker Agent")
@@ -65,7 +68,7 @@ class RerankerAgent:
             def _run_cross_encoder():
                 self._load()
                 pairs  = [(query, c.chunk.content) for c in chunks]
-                scores = self._model.predict(pairs).tolist()
+                scores = self._model.rerank(pairs).tolist()
                 return scores
     
             rerank_scores = await loop.run_in_executor(None, _run_cross_encoder)
@@ -75,12 +78,12 @@ class RerankerAgent:
                 RerankedChunk(
                     chunk=c.chunk,
                     similarity_score=c.vector_score,
-                    reranker_score=float(s),
+                    reranker_score=float(s.get("relevance_score", 0)),
                 )
                 for c, s in zip(chunks, rerank_scores)
             ]
             logger.info(f"Reranker scores computed for {len(chunks)} chunks")
-            reranked.sort(key=lambda x: x.reranker_score, reverse=True)
+           # reranked.sort(key=lambda x: x.reranker_score, reverse=True)
             reranked = reranked[: self.config.top_n]
             dropped = len(chunks) - len(reranked)
 

@@ -48,3 +48,16 @@ node_modules/
 
 # Uploads
 uploads/
+
+
+.git
+__pycache__/
+*.pyc
+
+.env
+.cache/
+data/
+logs/
+
+.venv/
+node_modules/

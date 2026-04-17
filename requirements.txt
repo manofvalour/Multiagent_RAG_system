@@ -36,3 +36,8 @@ python-pptx
 pytesseract
 ragas
 datasets
+groq
+langsmith
+pypdf
+pymupdf
+transformers

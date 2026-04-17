@@ -292,6 +292,8 @@ async def root():
         "name": settings.app_name,
         "version": settings.app_version,
         "docs": "/docs",
-        "health": "/health",
-        "ui": "/ui"
+        "health": "/health"
     }
+
+
+
