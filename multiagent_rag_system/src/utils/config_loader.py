@@ -20,6 +20,7 @@ from pydantic import BaseModel, Field, AnyHttpUrl, model_validator
 from typing import Optional
 from pydantic import BaseModel, Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+import os
 
 
 _BASE_DIR  = Path(__file__).resolve().parent.parent.parent
@@ -101,7 +102,7 @@ class RerankerConfig(BaseModel):
     """Cross-encoder reranking stage."""
     enabled: bool = True
     top_n:int = 3
-    model:str = "jinaai/jina-reranker-v3"
+    model:str = "cross-encoder/ms-marco-MiniLM-L-6-v2" #"jinaai/jina-reranker-v3"
     #"cross-encoder/ms-marco-MiniLM-L-6-v2"
     #"BAAI/bge-reranker-v2-m3"
 
@@ -118,7 +119,7 @@ class QueryExpansionConfig(BaseModel):
 
 class EmbeddingsConfig(BaseModel):
     """Sentence-transformer embedding model settings."""
-    model:str = "sentence-transformers/all-MiniLM-L6-v2"
+    model:str = "sentence-transformers/all-MiniLM-L6-v2" #cross-encoder/ms-marco-MiniLM-L-6-v2
     embedding_dim: int = 384
     batch_size: int = 64
 
@@ -145,13 +146,13 @@ class CacheConfig(BaseModel):
 class VectorStoreConfig(BaseModel):
     """Qdrant vector store connection and HNSW index settings."""
     # Connection — server mode when url is set, local mode when url is ""
-    url: str = ""
-    api_key: str = ""           # override via QDRANT_API_KEY in .env
+    url: str = ""#os.getenv("QDRANT_ENDPOINT")
+    api_key: str = ""#os.getenv("QDRANT_API_KEY")           # override via QDRANT_API_KEY in .env
     collection_name: str = "rag_chunks"
     hnsw_m: int = 16   
     hnsw_ef_construct: int = 100  
     hnsw_ef: int = 128   
-    local_path: str = "./data/qdrant"
+    local_path: str = "./data/qdrant" #"http://qdrant:6333"
 
 
 class RetrieverConfig(BaseModel):

@@ -26,11 +26,9 @@ class RerankerAgent:
  
     def _load(self) -> None:
         if self._model is None:
-           # from sentence_transformers import CrossEncoder
-            from transformers import AutoModel
-            #self._model = CrossEncoder(self.config.model)
-            self._model = AutoModel.from_pretrained(self.config.model, dtype="auto",
-                                                    trust_remote_code=True,)
+            from sentence_transformers import CrossEncoder
+            self._model = CrossEncoder(self.config.model)
+        
             logger.info(f"CrossEncoder loaded: {self.config.model}")
  
     @traceable(name = "Reranker Agent")
@@ -67,8 +65,8 @@ class RerankerAgent:
             print("Running cross-encoder in executor...")
             def _run_cross_encoder():
                 self._load()
-                pairs  = [(query, c.chunk.content) for c in chunks]
-                scores = self._model.rerank(pairs).tolist()
+                chunk_content  = [c.chunk.content for c in chunks]
+                scores = self._model.rank(query, chunk_content)#.tolist()
                 return scores
     
             rerank_scores = await loop.run_in_executor(None, _run_cross_encoder)
@@ -78,7 +76,7 @@ class RerankerAgent:
                 RerankedChunk(
                     chunk=c.chunk,
                     similarity_score=c.vector_score,
-                    reranker_score=float(s.get("relevance_score", 0)),
+                    reranker_score=float(s.get("score", 0)),
                 )
                 for c, s in zip(chunks, rerank_scores)
             ]

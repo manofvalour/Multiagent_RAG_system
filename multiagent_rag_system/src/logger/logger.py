@@ -52,7 +52,7 @@ class CustomLogger:
 
 
 # Global, shared logger instance for the package
-GLOBAL_LOGGER = CustomLogger().get_logger("mulitagent_rag_system")
+#GLOBAL_LOGGER = CustomLogger().get_logger("mulitagent_rag_system")
 
 
 #if __name__ == "__main__":
