@@ -40,6 +40,12 @@
     grid-template-rows: auto 1fr;
   }
 
+  /* Split panels (paper reader) */
+  body.paper-reader-active {
+    grid-template-columns: 240px 420px 1fr;
+  }
+  body.paper-reader-active aside { display: none; }
+
   /* ── Header ─────────────────────────────────────── */
   header {
     grid-column: 1 / -1;
@@ -150,6 +156,251 @@
     max-width: 860px;
   }
   .panel.active { display: block; }
+
+  /* ── Paper Reader — split layout ───────────────────── */
+  #panel-paper-reader {
+    display: none;
+    padding: 0;
+    max-width: 100%;
+    height: calc(100vh - 52px);
+    animation: none;
+    gap: 0;
+    grid-template-columns: 420px 1fr;
+  }
+  #panel-paper-reader.active {
+    display: grid;
+  }
+
+  .pr-search-panel {
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .pr-search-header {
+    padding: 20px 20px 16px;
+    border-bottom: 1px solid var(--border);
+    position: sticky; top: 0;
+    background: var(--bg);
+    z-index: 10;
+  }
+
+  .pr-search-box {
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+  }
+  .pr-search-box .field { flex: 1; margin-bottom: 0; }
+
+  .pr-results {
+    flex: 1;
+    overflow-y: auto;
+  }
+
+  .pr-paper-item {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: background .15s;
+  }
+  .pr-paper-item:hover { background: rgba(255,255,255,.03); }
+  .pr-paper-item.active { background: var(--accent-lo); border-left: 2px solid var(--accent); }
+  .pr-paper-item-title {
+    font-family: var(--serif);
+    font-size: 14px;
+    font-weight: 300;
+    color: var(--text);
+    margin-bottom: 5px;
+    line-height: 1.4;
+  }
+  .pr-paper-meta {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+  }
+  .pr-paper-meta .date { color: var(--accent); font-size: 10px; }
+  .pr-paper-authors { color: var(--text-dim); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 200px; }
+  .pr-paper-abstract {
+    font-size: 11.5px;
+    color: var(--muted);
+    line-height: 1.5;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .pr-paper-actions {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+  }
+
+  .pr-reader-panel {
+    overflow-y: auto;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .pr-reader-header {
+    padding: 18px 24px 14px;
+    border-bottom: 1px solid var(--border);
+    position: sticky; top: 0;
+    background: var(--bg);
+    z-index: 10;
+  }
+  .pr-reader-title {
+    font-family: var(--serif);
+    font-size: 18px;
+    font-weight: 200;
+    color: var(--text);
+    margin-bottom: 6px;
+    line-height: 1.3;
+  }
+  .pr-reader-meta {
+    font-size: 11px;
+    color: var(--text-dim);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+  }
+
+  .pr-reader-toolbar {
+    display: flex;
+    gap: 8px;
+    padding: 12px 24px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(255,255,255,.02);
+  }
+  .pr-reader-toolbar .tab-btn {
+    background: none; border: none; color: var(--text-dim);
+    padding: 6px 12px; cursor: pointer; font-family: var(--mono); font-size: 11px;
+    border-bottom: 2px solid transparent; transition: all .15s;
+  }
+  .pr-reader-toolbar .tab-btn:hover { color: var(--text); }
+  .pr-reader-toolbar .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  .pr-reader-body {
+    flex: 1;
+    padding: 24px;
+    overflow-y: auto;
+  }
+
+  .pr-reader-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: var(--text-dim);
+    font-size: 13px;
+    gap: 12px;
+  }
+  .pr-reader-empty-icon { font-size: 40px; opacity: .3; }
+
+  /* Section heading inside reader */
+  .pr-section-title {
+    font-size: 10px; letter-spacing: 2px; text-transform: uppercase;
+    color: var(--text-dim); margin: 20px 0 10px;
+    border-bottom: 1px solid var(--border); padding-bottom: 6px;
+  }
+  .pr-section-title:first-child { margin-top: 0; }
+
+  .pr-finding {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px 14px;
+    margin-bottom: 8px;
+    font-size: 12px;
+    color: var(--text);
+    line-height: 1.6;
+  }
+
+  .pr-code-block {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    margin-bottom: 12px;
+    overflow-x: auto;
+  }
+  .pr-code-block .code-lang {
+    font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase;
+    color: var(--accent); margin-bottom: 8px;
+  }
+  .pr-code-block pre {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text);
+    white-space: pre;
+    line-height: 1.6;
+  }
+  .pr-code-block .code-desc { font-size: 11px; color: var(--text-dim); margin-top: 8px; }
+
+  .pr-math-block {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text);
+    white-space: pre-wrap;
+    line-height: 1.7;
+    margin-bottom: 12px;
+  }
+
+  .pr-key-finding {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    padding: 8px 12px;
+    background: rgba(90,138,106,.06);
+    border: 1px solid rgba(90,138,106,.15);
+    border-radius: 4px;
+    margin-bottom: 6px;
+    font-size: 12px;
+    color: var(--text);
+    line-height: 1.5;
+  }
+  .pr-key-finding-icon { color: var(--green); margin-top: 1px; flex-shrink: 0; }
+
+  .pr-limitation {
+    background: rgba(138,74,74,.05);
+    border: 1px solid rgba(138,74,74,.15);
+    border-radius: 4px;
+    padding: 10px 14px;
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-top: 8px;
+  }
+  .pr-limitation-label { font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; color: #b87a7a; margin-bottom: 4px; }
+
+  .pr-loading-overlay {
+    display: none;
+    align-items: center;
+    gap: 10px;
+    color: var(--text-dim);
+    font-size: 12px;
+    padding: 16px;
+  }
+  .pr-loading-overlay.visible { display: flex; }
+  .spinner {
+    width: 16px; height: 16px;
+    border: 2px solid var(--muted);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin .7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
 
   @keyframes fadein { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 
@@ -334,26 +585,7 @@
   }
   .chunk-text { color: var(--text); font-size: 12px; line-height: 1.65; }
 
-  /* ── Loading ──────────────────────────────────────── */
-  .loading {
-    display: none;
-    align-items: center;
-    gap: 10px;
-    color: var(--text-dim);
-    font-size: 12px;
-    margin-top: 14px;
-  }
-  .loading.visible { display: flex; }
-  .spinner {
-    width: 16px; height: 16px;
-    border: 2px solid var(--muted);
-    border-top-color: var(--accent);
-    border-radius: 50%;
-    animation: spin .7s linear infinite;
-  }
-  @keyframes spin { to { transform: rotate(360deg); } }
-
-  /* ── Error ────────────────────────────────────────── */
+  /* ── Config bar ───────────────────────────────────── */
   .error-box {
     display: none;
     background: rgba(138,74,74,.08);
@@ -462,7 +694,7 @@
   .source-name { color: var(--text); max-width: 70%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .source-count { color: var(--accent); font-style: italic; font-family: var(--serif); font-size: 16px; font-weight: 200; }
 
-  /* ── Ingest ───────────────────────────────────────── */
+  /* ── Config bar ───────────────────────────────────── */
   .file-drop {
     border: 1px dashed var(--muted);
     border-radius: var(--radius);
@@ -543,6 +775,9 @@
     </div>
     <div class="nav-item" data-panel="ingest-file" onclick="switchPanel(this)">
       <span class="nav-icon">⊞</span> Ingest File
+    </div>
+    <div class="nav-item" data-panel="paper-reader" onclick="switchPanel(this)">
+      <span class="nav-icon">📄</span> Paper Reader
     </div>
     <div class="nav-item" data-panel="delete" onclick="switchPanel(this)">
       <span class="nav-icon">⊗</span> Delete Doc
@@ -802,6 +1037,70 @@
       <div class="sources-section">
         <div class="claims-title" style="margin-bottom:0;">Top Sources</div>
         <div id="analytics-sources"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Paper Reader Panel (split layout) ─── -->
+  <div class="panel" id="panel-paper-reader">
+
+    <!-- LEFT: Search results list -->
+    <div class="pr-search-panel">
+      <div class="pr-search-header">
+        <div class="panel-title" style="font-family:var(--serif);font-weight:200;font-size:18px;margin-bottom:4px;">Paper Search</div>
+        <div class="panel-sub" style="font-size:11px;color:var(--text-dim);margin-bottom:12px;">Search arXiv for research papers</div>
+        <div class="pr-search-box">
+          <div class="field" style="margin-bottom:0;flex:1;">
+            <input type="text" id="paper-search-query" placeholder="e.g. attention mechanism transformer..." style="width:100%;" />
+          </div>
+          <button class="btn btn-primary" onclick="searchPapers()" style="font-size:11px;padding:8px 16px;">Search</button>
+        </div>
+      </div>
+
+      <div class="pr-loading-overlay" id="paper-loading">
+        <div class="spinner"></div>
+        <span>Fetching papers…</span>
+      </div>
+      <div class="error-box" id="paper-error" style="margin:12px;"></div>
+
+      <div class="pr-results" id="paper-results"></div>
+    </div>
+
+    <!-- RIGHT: AI reader panel -->
+    <div class="pr-reader-panel">
+      <div id="pr-empty-state" class="pr-reader-empty">
+        <div class="pr-reader-empty-icon">⊜</div>
+        <div>Select a paper from the list to begin reading</div>
+      </div>
+
+      <div id="pr-reader-content" style="display:none; flex-direction:column; height:100%;">
+        <div class="pr-reader-header">
+          <div class="pr-reader-title" id="pr-paper-title"></div>
+          <div class="pr-reader-meta" id="pr-paper-meta"></div>
+        </div>
+
+        <div class="pr-reader-toolbar">
+          <button class="tab-btn active" data-tab="summary" onclick="showReaderTab(this)">Summary</button>
+          <button class="tab-btn" data-tab="findings" onclick="showReaderTab(this)">Key Findings</button>
+          <button class="tab-btn" data-tab="math" onclick="showReaderTab(this)">Math</button>
+          <button class="tab-btn" data-tab="code" onclick="showReaderTab(this)">Code</button>
+          <button class="tab-btn" data-tab="arch" onclick="showReaderTab(this)">Architecture</button>
+          <button class="tab-btn" data-tab="abstract" onclick="showReaderTab(this)">Abstract</button>
+        </div>
+
+        <div class="pr-reader-body">
+          <div id="tab-summary-content"></div>
+          <div id="tab-findings-content" style="display:none;"></div>
+          <div id="tab-math-content" style="display:none;"></div>
+          <div id="tab-code-content" style="display:none;"></div>
+          <div id="tab-arch-content" style="display:none;"></div>
+          <div id="tab-abstract-content" style="display:none;"></div>
+        </div>
+
+        <div style="padding:14px 24px; border-top:1px solid var(--border); display:flex; gap:10px;">
+          <a id="pr-pdf-link" href="#" target="_blank" class="btn btn-ghost" style="font-size:11px;">PDF ↗</a>
+          <span id="pr-paper-id-label" style="font-size:10px;color:var(--text-dim);align-self:center;margin-left:auto;"></span>
+        </div>
       </div>
     </div>
   </div>
@@ -1145,6 +1444,195 @@ async function loadAnalytics() {
   } finally {
     setLoading('analytics', false);
   }
+}
+
+// ── Paper Reader ──────────────────────────────────────
+
+let currentPaper = null;
+
+async function searchPapers() {
+  const q = $('paper-search-query').value.trim();
+  if(!q) return;
+
+  setError('paper', null);
+  setLoading('paper', true);
+
+  try {
+    const d = await apiFetch(`/papers/search?q=${encodeURIComponent(q)}&max_results=10`);
+    renderPaperResults(d.papers || []);
+  } catch(e) {
+    setError('paper', e.message);
+  } finally {
+    setLoading('paper', false);
+  }
+}
+
+function renderPaperResults(papers) {
+  const el = $('paper-results');
+  if(!papers.length) {
+    el.innerHTML = '<div style="padding:24px; color:var(--text-dim); font-size:12px; text-align:center;">No papers found. Try a different query.</div>';
+    return;
+  }
+
+  el.innerHTML = papers.map(p => `
+    <div class="pr-paper-item" onclick="openPaper('${escHtml(p.paper_id)}', this)">
+      <div class="pr-paper-item-title">${escHtml(p.title)}</div>
+      <div class="pr-paper-meta">
+        ${p.published_date ? `<span class="date">${new Date(p.published_date).toLocaleDateString('en-US', {year:'numeric',month:'short',day:'numeric'})}</span>` : ''}
+        <span>arXiv</span>
+      </div>
+      <div class="pr-paper-authors">${escHtml((p.authors || []).slice(0,3).join(', '))}${(p.authors || []).length > 3 ? ' et al.' : ''}</div>
+      <div class="pr-paper-abstract">${escHtml(p.abstract || '')}</div>
+      <div class="pr-paper-actions">
+        <button class="btn btn-ghost" style="font-size:10px;padding:4px 10px;" onclick="event.stopPropagation(); openPaper('${escHtml(p.paper_id)}', this.closest('.pr-paper-item'))">Analyze →</button>
+        ${p.pdf_url ? `<a href="${escHtml(p.pdf_url)}" target="_blank" class="btn btn-ghost" style="font-size:10px;padding:4px 10px;" onclick="event.stopPropagation();">PDF</a>` : ''}
+      </div>
+    </div>
+  `).join('');
+}
+
+async function openPaper(paperId, rowEl) {
+  // Highlight selected
+  document.querySelectorAll('.pr-paper-item').forEach(el => el.classList.remove('active'));
+  if(rowEl) rowEl.classList.add('active');
+
+  // Show empty state in reader
+  $('pr-empty-state').style.display = 'none';
+  $('pr-reader-content').style.display = 'none';
+  document.body.classList.add('paper-reader-active');
+
+  try {
+    const paper = await apiFetch(`/papers/${encodeURIComponent(paperId)}`);
+    currentPaper = paper;
+
+    // Update header
+    $('pr-paper-title').textContent = paper.title;
+    const dateStr = paper.published_date ? new Date(paper.published_date).toLocaleDateString('en-US', {year:'numeric',month:'short',day:'numeric'}) : '';
+    $('pr-paper-meta').innerHTML = `
+      ${dateStr ? `<span>${dateStr}</span>` : ''}
+      <span style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml((paper.authors || []).slice(0,3).join(', '))}${(paper.authors || []).length > 3 ? ' et al.' : ''}</span>
+      ${paper.topics?.length ? `<span style="color:var(--accent);font-size:10px;">${paper.topics.slice(0,2).join(', ')}</span>` : ''}
+    `;
+
+    // PDF link
+    if(paper.pdf_url) {
+      $('pr-pdf-link').href = paper.pdf_url;
+      $('pr-pdf-link').style.display = 'inline-flex';
+    } else {
+      $('pr-pdf-link').style.display = 'none';
+    }
+    $('pr-paper-id-label').textContent = paper.paper_id || paperId;
+
+    // Show reader content
+    $('pr-reader-content').style.display = 'flex';
+
+    // Show loading in body
+    $('tab-summary-content').innerHTML = '<div style="display:flex;align-items:center;gap:10px;padding:20px;color:var(--text-dim);font-size:12px;"><div class="spinner"></div>Analyzing paper…</div>';
+    $('tab-findings-content').innerHTML = $('tab-summary-content').innerHTML;
+    $('tab-math-content').innerHTML = $('tab-summary-content').innerHTML;
+    $('tab-code-content').innerHTML = $('tab-summary-content').innerHTML;
+    $('tab-arch-content').innerHTML = $('tab-summary-content').innerHTML;
+    $('tab-abstract-content').innerHTML = $('tab-summary-content').innerHTML;
+
+    // Switch to summary tab
+    showReaderTab(document.querySelector('.pr-reader-toolbar .tab-btn[data-tab="summary"]'));
+
+    // Fetch AI analysis
+    const analysis = await apiFetch(`/papers/${encodeURIComponent(paperId)}/read?include_math=true&include_code=true`, { method: 'POST' });
+
+    renderAnalysis(analysis, paper);
+
+  } catch(e) {
+    $('pr-reader-content').style.display = 'flex';
+    $('pr-empty-state').style.display = 'flex';
+    $('pr-empty-state').innerHTML = `<div class="pr-reader-empty-icon">✗</div><div style="color:var(--red);">Failed to load paper: ${escHtml(e.message)}</div>`;
+    document.body.classList.remove('paper-reader-active');
+  }
+}
+
+function renderAnalysis(a, paper) {
+  // Summary tab
+  $('tab-summary-content').innerHTML = `
+    <div class="pr-section-title">AI Summary</div>
+    <p style="font-size:13px;line-height:1.75;color:var(--text);margin-bottom:16px;">${escHtml(a.summary || 'No summary available.')}</p>
+    <div class="pr-section-title">Intuition</div>
+    <p style="font-size:12px;line-height:1.7;color:var(--text-dim);">${escHtml(a.intuition || 'Not available.')}</p>
+  `;
+
+  // Findings tab
+  const findings = (a.key_findings || []).map(f => `
+    <div class="pr-key-finding">
+      <span class="pr-key-finding-icon">✓</span>
+      <span>${escHtml(f)}</span>
+    </div>
+  `).join('');
+  const limitations = a.limitations ? `
+    <div class="pr-limitation">
+      <div class="pr-limitation-label">Limitations</div>
+      ${escHtml(a.limitations)}
+    </div>
+  ` : '';
+  $('tab-findings-content').innerHTML = (findings || '<div style="color:var(--text-dim);font-size:12px;padding:12px;">No key findings available.</div>')
+    + limitations;
+
+  // Math tab
+  if(a.math_breakdown) {
+    $('tab-math-content').innerHTML = `
+      <div class="pr-section-title">Mathematical Analysis</div>
+      <div class="pr-math-block">${escHtml(a.math_breakdown)}</div>
+    `;
+  } else {
+    $('tab-math-content').innerHTML = '<div style="color:var(--text-dim);font-size:12px;padding:12px;">No mathematical content found in this paper.</div>';
+  }
+
+  // Code tab
+  const codeSnippets = (a.code_snippets || []).map(s => `
+    <div class="pr-code-block">
+      <div class="code-lang">${escHtml(s.language || 'code')}</div>
+      <pre><code>${escHtml(s.code)}</code></pre>
+      ${s.description ? `<div class="code-desc">${escHtml(s.description)}</div>` : ''}
+    </div>
+  `).join('');
+  $('tab-code-content').innerHTML = codeSnippets || '<div style="color:var(--text-dim);font-size:12px;padding:12px;">No code snippets found in this paper.</div>';
+
+  // Architecture tab
+  $('tab-arch-content').innerHTML = a.architecture_notes
+    ? `<div style="white-space:pre-wrap;font-size:13px;line-height:1.75;color:var(--text);">${escHtml(a.architecture_notes)}</div>`
+    : '<div style="color:var(--text-dim);font-size:12px;padding:12px;">No architecture notes available.</div>';
+
+  // Abstract tab
+  $('tab-abstract-content').innerHTML = `
+    <div class="pr-section-title">Abstract</div>
+    <p style="font-size:13px;line-height:1.75;color:var(--text);">${escHtml(paper.abstract || 'No abstract available.')}</p>
+    <div class="pr-section-title">Metadata</div>
+    <div style="font-size:12px;color:var(--text-dim);line-height:1.8;">
+      ${paper.paper_id ? `<div><strong>Paper ID:</strong> ${escHtml(paper.paper_id)}</div>` : ''}
+      ${paper.url ? `<div><strong>URL:</strong> <a href="${escHtml(paper.url)}" target="_blank" style="color:var(--accent);">${escHtml(paper.url)}</a></div>` : ''}
+      ${paper.pdf_url ? `<div><strong>PDF:</strong> <a href="${escHtml(paper.pdf_url)}" target="_blank" style="color:var(--accent);">${escHtml(paper.pdf_url)}</a></div>` : ''}
+      ${(paper.topics || []).length ? `<div><strong>Topics:</strong> ${paper.topics.map(t => escHtml(t)).join(', ')}</div>` : ''}
+      ${(paper.authors || []).length ? `<div><strong>Authors:</strong> ${paper.authors.map(a => escHtml(a)).join(', ')}</div>` : ''}
+    </div>
+  `;
+}
+
+function showReaderTab(btn) {
+  document.querySelectorAll('.pr-reader-toolbar .tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+
+  const tabMap = {
+    summary: 'summary-content',
+    findings: 'findings-content',
+    math: 'math-content',
+    code: 'code-content',
+    arch: 'arch-content',
+    abstract: 'abstract-content',
+  };
+  const tab = btn.dataset.tab;
+
+  ['summary-content', 'findings-content', 'math-content', 'code-content', 'arch-content', 'abstract-content'].forEach(id => {
+    const el = $(`tab-${id}`);
+    if(el) el.style.display = id === `${tab}-content` ? 'block' : 'none';
+  });
 }
 
 // ── Helpers ───────────────────────────────────────────

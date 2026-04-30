@@ -18,14 +18,14 @@ import uuid
 from typing import Optional
 
 from ..utils.config_loader import get_settings
-from ..models.models import DocumentChunk, RetrievedChunk
+from ..models.models import DocumentChunk, RetrievedChunk, PaperMetadata
 from ..logger import GLOBAL_LOGGER as logger
 
 settings = get_settings()
 
 class VectorStore:
     """
-    Async Qdrant wrapper.
+    Async Qdrant wrapper supporting both general RAG chunks and research papers.
 
     All heavy Qdrant calls (upsert, search) are dispatched to a thread-pool
     executor because qdrant-client's sync API blocks the calling thread.
@@ -37,12 +37,23 @@ class VectorStore:
       id      -> chunk.id (UUID)
       vector  -> normalised float32 embedding
       payload -> all DocumentChunk fields (stored as JSON, filterable)
+
+    For research papers, additional metadata fields are stored:
+      paper_id, title, authors, abstract, source, url, pdf_url, topics, citation_count
     """
 
-    def __init__(self, dim: int= settings.embeddings.embedding_dim) -> None:
-        self.config= settings.vector_store
-        self.dim     = dim
-        self._client = None     # initialised in connect()
+    RESEARCH_PAPERS_COLLECTION = "research_papers"
+
+    def __init__(
+        self,
+        dim: int = settings.embeddings.embedding_dim,
+        collection_name: Optional[str] = None,
+    ) -> None:
+        self.config = settings.vector_store
+        self.dim = dim
+        self._client = None  # initialised in connect()
+        # Use specified collection or fall back to config default
+        self._collection_name = collection_name or self.config.collection_name
 
     async def connect(self) -> None:
         """
@@ -60,11 +71,12 @@ class VectorStore:
         loop = asyncio.get_event_loop()
 
         def _build() -> QdrantClient:
-            if self.config.url:
+            endpoint = settings.qdrant_endpoint.get_secret_value()
+            if endpoint:
                 return QdrantClient(
-                    url=settings.qdrant_endpoint.get_secret_value(),
+                    url=endpoint,
                     api_key=settings.qdrant_api_key.get_secret_value(),
-                    timeout=30,
+                    timeout=self.config.timeout,
                 )
             return QdrantClient(path=self.config.local_path)
 
@@ -73,7 +85,7 @@ class VectorStore:
 
         count = await self.count()
         logger.info(
-            f"Qdrant ready  collection={self.config.collection_name!r}"
+            f"Qdrant ready  collection={self._collection_name!r}"
             f"points={count}  dim={self.dim}"
         )
 
@@ -84,12 +96,11 @@ class VectorStore:
         """
         from qdrant_client.models import Distance, HnswConfigDiff, VectorParams
 
-        existing = [c.name for c in self._client.get_collections().collections]
-        if self.config.collection_name in existing:
+        if self._client.collection_exists(self._collection_name):
             return
 
         self._client.create_collection(
-            collection_name=self.config.collection_name,
+            collection_name=self._collection_name,
             vectors_config=VectorParams(
                 size=self.dim,
                 # we use COSINE because the vectors are L2-normalised with sentence-transformers
@@ -102,7 +113,7 @@ class VectorStore:
             ),
         )
         logger.info(
-            f"Collection {self.config.collection_name} created"
+            f"Collection {self._collection_name} created"
             f"m={self.config.hnsw_m}  ef_construct={self.config.hnsw_ef_construct}"
         )
 
@@ -131,8 +142,6 @@ class VectorStore:
                 "id":           chunk.id,
                 "content":      chunk.content,
                 "chunk_index":  chunk.chunk_index,
-               # "content_type": chunk.content_type.value,
-                #"page_number":  chunk.page_number,
                 "doc_id":       chunk.doc_id,
                 "metadata":     chunk.metadata,
             }
@@ -144,12 +153,13 @@ class VectorStore:
                 )
             )
 
-        # wait=True ensures the points are indexed before we return —
-        # important for correctness, not just eventual consistency.
+        # wait=False: index asynchronously so the HTTP request doesn't time out on large batches
+        # Data is searchable shortly after the response returns
         self._client.upsert(
-            collection_name=self.config.collection_name,
+            collection_name=self._collection_name,
             points=points,
-            wait=True,
+            wait=False,
+            timeout=self.config.timeout,
         )
         logger.info(f"Upserted {len(points)} points")
 
@@ -164,14 +174,6 @@ class VectorStore:
     ) -> list[RetrievedChunk]:
         """
         HNSW approximate nearest-neighbour search.
-
-        ef_search  — query-time beam width:
-                     higher  -> better recall, slower  (128-256 for production)
-                     lower   -> faster, less accurate  (32-64 for latency-sensitive paths)
-
-        filters    — Qdrant payload filter dict, e.g.
-                     {"must": [{"key": "sourc", "match": {"value": "report.pdf"}}]}
-                     Passed to Qdrant's Filter(**filters) constructor.
         """
         if self._client is None:
             logger.info("Qdrant not initialized!")
@@ -213,7 +215,7 @@ class VectorStore:
            # qdrant_filter = Filter.model_validate(filters) if filters else None
 
         response = self._client.query_points(
-            collection_name=self.config.collection_name,
+            collection_name=self._collection_name,
             query=query_vec,
             limit=top_k,
             score_threshold=threshold,
@@ -253,11 +255,10 @@ class VectorStore:
             doc_id=       p.get("doc_id"),
             metadata=     p.get("metadata", {}),
         )
-      #  logger.info(scored_point.score min(1.0, max(0.0, float(scored_point.score))))
+      #  logger.info(scored_point.score, min(1.0, max(0.0, float(scored_point.score))))
         return RetrievedChunk(chunk=chunk, vector_score=min(1.0, max(0.0, float(scored_point.score))))
 
     #Delete from QDrant
-
     async def delete_document(self, doc_id: str) -> int:
         """
         Delete all points belonging to doc_id using a payload filter.
@@ -275,7 +276,7 @@ class VectorStore:
         )
         # Count before so we can report how many were removed
         before = self._client.count(
-            collection_name=self.config.collection_name,
+            collection_name=self._collection_name,
             count_filter=filt,
             exact=True,
         ).count
@@ -284,7 +285,7 @@ class VectorStore:
             return 0
 
         self._client.delete(
-            collection_name=self.config.collection_name,
+            collection_name=self._collection_name,
             points_selector=filt,
             wait=True,
         )
@@ -300,7 +301,7 @@ class VectorStore:
         result = await loop.run_in_executor(
             None,
             lambda: self._client.count(
-                collection_name=self.config.collection_name, exact=False
+                collection_name=self._collection_name, exact=False
             ),
         )
         return result.count
@@ -312,23 +313,155 @@ class VectorStore:
         loop = asyncio.get_event_loop()
         info = await loop.run_in_executor(
             None,
-            lambda: self._client.get_collection(self.config.collection_name),
+            lambda: self._client.get_collection(self._collection_name),
         )
         return {
-            "name":              self.config.collection_name,
+            "name":              self._collection_name,
             "vectors_count":     getattr(info, "vectors_count", info.points_count),
             "points_count":      info.points_count,
             "status":            str(info.status),
             "hnsw_m":            self.config.hnsw_m,
             "hnsw_ef_construct": self.config.hnsw_ef_construct,
         }
-    
-_store: Optional[VectorStore]=None
 
-async def get_vector_store()-> VectorStore:
+    # Research paper-specific methods
+
+    async def search_paper_by_id(self, paper_id: str) -> list[PaperMetadata]:
+        """Search for a paper by its ID in the research_papers collection."""
+        if self._client is None:
+            return []
+        from ..models.models import PaperMetadata as PMPaperMetadata
+        loop = asyncio.get_event_loop()
+
+        def _search():
+            from qdrant_client.models import Filter, FieldCondition, MatchValue
+            filt = Filter(
+                must=[FieldCondition(key="paper_id", match=MatchValue(value=paper_id))]
+            )
+            response = self._client.query_points(
+                collection_name=self.RESEARCH_PAPERS_COLLECTION,
+                query=[0.0] * self.dim,
+                limit=1,
+                query_filter=filt,
+                with_payload=True,
+            )
+            return response.points if hasattr(response, "points") else response
+
+        points = await loop.run_in_executor(None, _search)
+        results = []
+        for hit in points:
+            p = hit.payload
+            results.append(PMPaperMetadata(
+                paper_id=p.get("paper_id", ""),
+                title=p.get("title", ""),
+                authors=p.get("authors", []),
+                abstract=p.get("abstract", ""),
+                source=p.get("source", "arxiv"),
+                url=p.get("url", ""),
+                pdf_url=p.get("pdf_url"),
+                published_date=p.get("published_date"),
+                topics=p.get("topics", []),
+                citation_count=p.get("citation_count"),
+            ))
+        return results
+
+    async def get_paper_chunks(self, paper_id: str) -> list[DocumentChunk]:
+        """Get all document chunks for a specific paper."""
+        if self._client is None:
+            return []
+        loop = asyncio.get_event_loop()
+
+        def _search():
+            from qdrant_client.models import Filter, FieldCondition, MatchValue
+            filt = Filter(
+                must=[FieldCondition(key="paper_id", match=MatchValue(value=paper_id))]
+            )
+            response = self._client.query_points(
+                collection_name=self.RESEARCH_PAPERS_COLLECTION,
+                query=[0.0] * self.dim,
+                limit=100,
+                query_filter=filt,
+                with_payload=True,
+            )
+            return response.points if hasattr(response, "points") else response
+
+        points = await loop.run_in_executor(None, _search)
+        chunks = []
+        for hit in points:
+            p = hit.payload
+            chunks.append(DocumentChunk(
+                id=p.get("id", ""),
+                doc_id=p.get("doc_id", ""),
+                content=p.get("content", ""),
+                metadata=p.get("metadata", {}),
+                chunk_index=p.get("chunk_index", 0),
+            ))
+        return chunks
+
+    async def add_paper_chunks(
+        self, chunks: list[DocumentChunk], embeddings, paper: "PaperMetadata"
+    ) -> None:
+        """Add paper chunks with paper metadata to the research_papers collection."""
+        if not chunks:
+            return
+
+        loop = asyncio.get_event_loop()
+
+        def _upsert():
+            from qdrant_client.models import PointStruct
+
+            points = []
+            for chunk, emb in zip(chunks, embeddings):
+                payload = {
+                    "id": chunk.id,
+                    "content": chunk.content,
+                    "chunk_index": chunk.chunk_index,
+                    "doc_id": chunk.doc_id,
+                    "metadata": chunk.metadata,
+                    "paper_id": paper.paper_id,
+                    "title": paper.title,
+                    "authors": paper.authors,
+                    "abstract": paper.abstract,
+                    "source": paper.source.value if hasattr(paper.source, 'value') else str(paper.source),
+                    "url": paper.url,
+                    "pdf_url": paper.pdf_url,
+                    "topics": paper.topics,
+                }
+                points.append(
+                    PointStruct(
+                        id=str(uuid.UUID(chunk.id)),
+                        vector=emb.tolist(),
+                        payload=payload,
+                    )
+                )
+            self._client.upsert(
+                collection_name=self.RESEARCH_PAPERS_COLLECTION,
+                points=points,
+                wait=True,
+            )
+
+        await loop.run_in_executor(None, _upsert)
+
+
+_store: Optional[VectorStore] = None
+
+
+async def get_vector_store(collection_name: Optional[str] = None) -> VectorStore:
+    """Singleton for the default vector store (rag_chunks collection)."""
     global _store
     if _store is None:
-        _store = VectorStore()
+        _store = VectorStore(collection_name=collection_name)
         await _store.connect()
-
     return _store
+
+
+_paper_store: Optional[VectorStore] = None
+
+
+async def get_paper_vector_store() -> VectorStore:
+    """Singleton for research papers vector store."""
+    global _paper_store
+    if _paper_store is None:
+        _paper_store = VectorStore(collection_name=VectorStore.RESEARCH_PAPERS_COLLECTION)
+        await _paper_store.connect()
+    return _paper_store

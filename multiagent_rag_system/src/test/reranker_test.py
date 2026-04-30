@@ -7,9 +7,10 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
-from ..models.models import (ContentType, DocumentChunk, 
+from ..models.models import (ContentType, DocumentChunk,
                                  QueryResponse, AgentStatus, Claim,
                                  RerankedChunk, RetrievedChunk)
+from ..llm.llms import LLMResponse
 
 #Shared fixtures
 
@@ -17,11 +18,9 @@ def _make_doc(i: int, content: str = None) -> DocumentChunk:
     return DocumentChunk(
         id=f"aaaaaaaa-0000-0000-0000-00000000000{i}",
         content=content or f"RAG is a technique that combines retrieval and generation. Chunk {i}.",
-        source=f"doc{i}.txt",
         chunk_index=i,
-        content_type=ContentType.PROSE,
-        metadata={},
-        doc_id = f"doc-00{i}",
+        doc_id=f"doc-00{i}",
+        metadata={"source": f"doc{i}.txt"},
     )
 
 
@@ -55,7 +54,7 @@ def sample_claims(docs) -> list[Claim]:
 def mock_llm():
     llm = MagicMock()
     llm.complete = AsyncMock(
-        return_value=QueryResponse(answer="RAG reduces hallucinations by grounding answers.")
+        return_value=LLMResponse(text="RAG reduces hallucinations by grounding answers.")
     )
     return llm
 
@@ -76,6 +75,8 @@ class TestRerankerAgent:
     def _make_agent(self, enabled: bool = True, top_n: int = 2):
         from multiagent_rag_system.agent.agents.reranker_agent import RerankerAgent
         agent = RerankerAgent()
+
+        
         agent.config = MagicMock()
         agent.config.enabled = enabled
         agent.config.top_n   = top_n
@@ -106,31 +107,39 @@ class TestRerankerAgent:
     async def test_enabled_sorts_by_reranker_score(self, retrieved_chunks):
         agent = self._make_agent(enabled=True, top_n=3)
 
-        # Mock the CrossEncoder to return preset scores in reverse order
-        # (so reranker reverses the retrieval order)
-        fake_scores = [0.3, 0.9, 0.6]   # chunk[1] should come first after sort
+        # Mock the CrossEncoder.rank() to return scores in reverse order
+        # rank() returns dicts with 'score' key, sorted descending by score.
+        # The zip pairs each chunk with its score by index.
+        fake_rank_results = [
+            {"corpus_id": 2, "score": 0.9},   # chunk[2] gets highest score
+            {"corpus_id": 0, "score": 0.6},   # chunk[0] gets middle
+            {"corpus_id": 1, "score": 0.3},   # chunk[1] gets lowest
+        ]
 
         with patch.object(agent, "_load"):
             agent._model = MagicMock()
-            import numpy as np
-            agent._model.predict = MagicMock(return_value=np.array(fake_scores))
+            agent._model.rank = MagicMock(return_value=fake_rank_results)
 
             reranked, event = await agent.rerank("What is RAG?", retrieved_chunks)
 
         assert event.status == AgentStatus.DONE
-        # First result should have the highest reranker score
+        # rank() returns results sorted by score descending, zip pairs by index,
+        # so the first result in reranked should have the highest reranker_score
         assert reranked[0].reranker_score == pytest.approx(0.9)
+        assert len(reranked) == 3
 
     @pytest.mark.asyncio
     async def test_top_n_cap_applied(self, retrieved_chunks):
         agent = self._make_agent(enabled=True, top_n=2)
 
+        fake_rank_results = [
+            {"corpus_id": 0, "score": 0.9},
+            {"corpus_id": 1, "score": 0.8},
+        ]
+
         with patch.object(agent, "_load"):
             agent._model = MagicMock()
-            import numpy as np
-            agent._model.predict = MagicMock(
-                return_value=np.array([0.9, 0.8, 0.7])
-            )
+            agent._model.rank = MagicMock(return_value=fake_rank_results)
             reranked, _ = await agent.rerank("q", retrieved_chunks)
 
         assert len(reranked) <= 2

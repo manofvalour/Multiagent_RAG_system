@@ -20,14 +20,18 @@ import os
 
 from multiagent_rag_system.agent.agents.doc_ingestion import DocumentIngestionPipeline
 from multiagent_rag_system.agent.pipeline.pipeline import RAGOrchestrator
+from multiagent_rag_system.agent.agents.paper_reader_agent import PaperReaderAgent
+from multiagent_rag_system.src.fetcher.paper_fetcher_service import PaperFetcherService
 from multiagent_rag_system.src.cache.cache import CacheClient
 from multiagent_rag_system.src.utils.config_loader import get_settings
 from multiagent_rag_system.src.logger import GLOBAL_LOGGER as logger
 from multiagent_rag_system.src.models.models import (
     HealthComponent, HealthResponse, IngestRequest, IngestResponse,
     QueryRequest, QueryResponse, QueryMetrics,
+    PaperSource, PaperMetadata, PaperAnalysis, PaperSearchRequest,
+    PaperSearchResponse, DocumentChunk,
 )
-from multiagent_rag_system.src.database.vector_store import get_vector_store
+from multiagent_rag_system.src.database.vector_store import get_vector_store, get_paper_vector_store
 from multiagent_rag_system.src.embedding.embedding import get_embedder
 from multiagent_rag_system.src.utils.metrics import (
     get_metrics_output, record_ingestion, record_query, 
@@ -42,16 +46,18 @@ config = settings.server
 UPLOAD_DIR = "data/uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-#Singletons initialised at startup
+#Singletons — initialized once in lifespan (avoids double init)
 _pipeline: Optional[RAGOrchestrator] = None
 _ingestion: Optional[DocumentIngestionPipeline] = None
 _cache: Optional[CacheClient] = None
+_paper_fetcher: Optional[PaperFetcherService] = None
+_paper_reader: Optional[PaperReaderAgent] = None
 _start_time: float = 0.0
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global _pipeline, _ingestion, _cache, _start_time
+    global _pipeline, _ingestion, _cache, _paper_fetcher, _paper_reader, _start_time
     _start_time = time.perf_counter()
     logger.info("startup", env=settings.environment, version=settings.app_version)
 
@@ -60,10 +66,14 @@ async def lifespan(app: FastAPI):
     # Warm up embedder and vector store
     await get_embedder()
     await get_vector_store()
+    await get_paper_vector_store()
 
+    # Initialize singletons once here (not at module level)
     _pipeline  = RAGOrchestrator()
     _ingestion = DocumentIngestionPipeline()
     _cache     = CacheClient()
+    _paper_fetcher = PaperFetcherService()
+    _paper_reader = PaperReaderAgent()
 
     logger.info("startup_complete")
     yield
@@ -258,7 +268,7 @@ async def analytics(window_minutes: int = 60):
     confidences = [h.get("confidence", {}).get("final", 0) for h in history]
     latencies   = [h.get("latency_ms", 0) for h in history]
     risks       = [h.get("hallucination_risk", "MEDIUM") for h in history]
-    cached_hits = sum(1 for h in history if h.get("cached"))
+    cached_hits  = sum(1 for h in history if h.get("cached"))
 
     source_counts: dict[str, int] = {}
     for h in history:
@@ -284,6 +294,100 @@ async def analytics(window_minutes: int = 60):
         cache_hit_rate=round(cached_hits / max(len(history), 1), 3),
         top_sources=top_sources,
     )
+
+
+# ─── Paper Reader Endpoints ────────────────────────────────────────────────────
+
+@app.get("/papers/search", response_model=PaperSearchResponse)
+async def search_papers(
+    q: str,
+   # sources: list[str]= ["arxiv"],
+    max_results: int = 10,
+    topic_filter: Optional[str] = None,
+):
+    """Search for research papers across multiple sources."""
+    #source_list = [PaperSource(s.strip()) for s in sources.split(",")]
+
+    papers = await _paper_fetcher.fetch_arxiv_papers(q, max_results)
+
+    return PaperSearchResponse(papers=papers, total=len(papers))
+
+
+@app.get("/papers/{paper_id}", response_model=PaperMetadata)
+async def get_paper(paper_id: str):
+    """Get paper metadata by ID. Checks cache, then vector store."""
+    # Try cache
+    cached = await _cache.get(f"paper:{paper_id}")
+    if cached:
+        return PaperMetadata(**cached)
+
+    # Try to get from paper vector store
+    try:
+        store = await get_paper_vector_store()
+        results = await store.search_paper_by_id(paper_id)
+        if results:
+            return results[0]
+    except Exception:
+        pass
+
+    raise HTTPException(status_code=404, detail=f"Paper {paper_id} not found")
+
+
+@app.post("/papers/{paper_id}/read", response_model=PaperAnalysis)
+async def read_paper(
+    paper_id: str,
+    include_math: bool = True,
+    include_code: bool = True,
+):
+    """Full AI-powered paper reading with intuition, math, and code breakdown."""
+    # Get paper metadata
+    paper = await get_paper(paper_id)
+
+    # Scrape PDF content for this single paper
+    if paper.pdf_url:
+        content = await _paper_fetcher.scrape_paper_pdf(paper.pdf_url)
+    else:
+        content = None
+
+    # Build chunks from scraped content (split into sections)
+    chunks = []
+    if content:
+        # Simple chunking: split on double newlines or by character count
+        sections = content.split('\n\n')
+        for i, section in enumerate(sections):
+            if len(section.strip()) > 50:  # Skip tiny sections
+                chunks.append(DocumentChunk(
+                    id=str(uuid.uuid4()),
+                    doc_id=f"paper-{paper_id}",
+                    content=section.strip()[:2000],  # Cap at 2000 chars per chunk
+                    chunk_index=i,
+                ))
+
+    # If no content from PDF, fall back to abstract as single chunk
+    if not chunks and paper.abstract:
+        chunks.append(DocumentChunk(
+            id=str(uuid.uuid4()),
+            doc_id=f"paper-{paper_id}",
+            content=paper.abstract,
+            chunk_index=0,
+        ))
+
+    # Run paper reader agent
+    analysis, event = await _paper_reader.run(
+        paper=paper,
+        chunks=chunks,
+        include_math=include_math,
+        include_code=include_code,
+    )
+
+    # Cache analysis result
+    await _cache.set(
+        f"paper:analysis:{paper_id}",
+        analysis.model_dump_json(),
+        ex=86400,
+    )
+
+    return analysis
 
 
 @app.get("/")

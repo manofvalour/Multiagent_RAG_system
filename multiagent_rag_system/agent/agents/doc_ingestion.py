@@ -100,9 +100,9 @@ class FileParser:
             if needs_ocr:
                 try:
                     import easyocr
-                    import fitz   # PyMuPDF
+                    import pymupdf
                     ocr = easyocr.Reader(["en"], gpu=False)
-                    doc = fitz.open(stream=content, filetype="pdf")
+                    doc = pymupdf.open(stream=content, filetype="pdf")
                     for page_num in needs_ocr:
                         pix  = doc[page_num].get_pixmap(dpi=200)
                         img  = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.h, pix.w, pix.n)

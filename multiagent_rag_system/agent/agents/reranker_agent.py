@@ -33,7 +33,8 @@ class RerankerAgent:
  
     @traceable(name = "Reranker Agent")
     async def rerank(self, query: str, 
-                  chunks: list[RetrievedChunk]) -> tuple[list[RerankedChunk], AgentEvent]:
+                  chunks: list[RetrievedChunk], 
+                  top_n = settings.reranker.top_n) -> tuple[list[RerankedChunk], AgentEvent]:
         
         try:
             t0 = time.perf_counter()
@@ -66,7 +67,7 @@ class RerankerAgent:
             def _run_cross_encoder():
                 self._load()
                 chunk_content  = [c.chunk.content for c in chunks]
-                scores = self._model.rank(query, chunk_content)#.tolist()
+                scores = self._model.rank(query, chunk_content, top_k=top_n)#.tolist()
                 return scores
     
             rerank_scores = await loop.run_in_executor(None, _run_cross_encoder)
@@ -82,7 +83,7 @@ class RerankerAgent:
             ]
             logger.info(f"Reranker scores computed for {len(chunks)} chunks")
            # reranked.sort(key=lambda x: x.reranker_score, reverse=True)
-            reranked = reranked[: self.config.top_n]
+            #reranked = reranked[: self.config.top_n]
             dropped = len(chunks) - len(reranked)
 
             logger.info(f"Reranked {len(chunks)} chunks in {time.perf_counter() - t0:.2f}s, kept {len(reranked)}, dropped {dropped}")

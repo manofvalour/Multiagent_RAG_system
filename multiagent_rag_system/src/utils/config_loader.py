@@ -146,13 +146,14 @@ class CacheConfig(BaseModel):
 class VectorStoreConfig(BaseModel):
     """Qdrant vector store connection and HNSW index settings."""
     # Connection — server mode when url is set, local mode when url is ""
-    url: str = ""#os.getenv("QDRANT_ENDPOINT")
+    url: str = os.getenv("QDRANT_ENDPOINT")
     api_key: str = ""#os.getenv("QDRANT_API_KEY")           # override via QDRANT_API_KEY in .env
     collection_name: str = "rag_chunks"
-    hnsw_m: int = 16   
-    hnsw_ef_construct: int = 100  
-    hnsw_ef: int = 128   
+    hnsw_m: int = 16
+    hnsw_ef_construct: int = 100
+    hnsw_ef: int = 128
     local_path: str = "./data/qdrant" #"http://qdrant:6333"
+    timeout: int = 120  # seconds — higher for Qdrant Cloud with large upserts
 
 
 class RetrieverConfig(BaseModel):
@@ -278,6 +279,25 @@ class JWTConfig(BaseModel):
     expire_minutes: int = 60
 
 
+class ArxivConfig(BaseModel):
+    """arXiv source configuration."""
+    enabled: bool = True
+    categories: list[str] = ["cs.AI", "cs.LG", "cs.CL", "cs.CV"]
+
+
+
+class ResearchSourcesConfig(BaseModel):
+    """Research paper sources configuration."""
+    arxiv: ArxivConfig = ArxivConfig()
+
+class PaperReaderConfig(BaseModel):
+    """Paper reader analysis settings."""
+    max_results: int = 10
+    analysis_model: str = "openai/gpt-oss-120b"
+    include_code: bool = True
+    include_math: bool = True
+
+
 #Root Settings
 class Settings(BaseSettings):
     """
@@ -316,8 +336,6 @@ class Settings(BaseSettings):
     #jwt_secret:SecretStr = Field(default="", alias="JWT_SECRET")
 
     # ── LLM provider registry ──────────────────────────────────────────────
-    # active_provider selects which entry in llm_providers is used at runtime.
-    # Both are populated from config.yaml's `llm:` section by _load_yaml().
     active_provider: LLMProvider = LLMProvider.GROQ
     llm_providers: dict[str, LLMProviderConfig] = {
         "groq": LLMProviderConfig(
@@ -348,6 +366,8 @@ class Settings(BaseSettings):
     observability: ObservabilityConfig = ObservabilityConfig()
     evaluation: EvaluationConfig = EvaluationConfig()
     agents: AgentConfig = AgentConfig()
+    research_sources: ResearchSourcesConfig = ResearchSourcesConfig()
+    paper_reader: PaperReaderConfig = PaperReaderConfig()
 
     #Computed properties
     @property

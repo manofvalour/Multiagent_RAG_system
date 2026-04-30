@@ -52,15 +52,24 @@ class DocumentChunk(BaseModel):
     page_number: Optional[int]= None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
+
 class RetrievedChunk(BaseModel):
     chunk: DocumentChunk
     vector_score: float=Field(ge=0.0, le=1.0)
     relevance_score: float = Field(ge=0.0, le=1.0, default=0.0)
 
+
 class RerankedChunk(BaseModel):
     chunk: DocumentChunk
     similarity_score: float=Field(ge=0.0, le=1.0)
     reranker_score: float = Field(default=0.0)
+
+
+class ScrapeResult(BaseModel):
+    url:str
+    markdown:str
+    metadata:dict
+
 
 ## setting up again trace
 class AgentEvent(BaseModel):
@@ -167,4 +176,50 @@ class APIKeyResponse(BaseModel):
     created_at:datetime
     expires_at: Optional[datetime]=None
 
+## Paper Reader models
+
+class PaperSource(str, Enum):
+    ARXIV = "arxiv"
+
+class PaperMetadata(BaseModel):
+    paper_id: str
+    title: str
+    authors: list[str]
+    abstract: str
+    source: PaperSource
+    content:Optional[str]= None
+    url: str
+    pdf_url: Optional[str] = None
+    published_date: datetime
+    topics: list[str] = []
+    citation_count: Optional[int] = None
+
+class CodeSnippet(BaseModel):
+    language: str
+    code: str
+    description: str
+    file_path: Optional[str] = None
+
+class PaperAnalysis(BaseModel):
+    """Structured output from PaperReaderAgent"""
+    paper_id: str
+    summary: str
+    key_findings: list[str]
+    intuition: str
+    math_breakdown: str
+    code_snippets: list[CodeSnippet] = []
+    architecture_notes: str
+    limitations: str
+    related_papers: list[str] = []
+    relevance_score: float = 0.0
+
+class PaperSearchRequest(BaseModel):
+    query: str
+    sources: list[PaperSource] = [PaperSource.ARXIV]
+    max_results: int = 10
+    topic_filter: Optional[str] = None
+
+class PaperSearchResponse(BaseModel):
+    papers: list[PaperMetadata]
+    total: int
 

@@ -86,3 +86,21 @@ observability:
   otlp_endpoint: "http://localhost:4317"
   sentry_dsn: ""
 
+paper_reader:
+  max_results: 10
+  analysis_model: "openai/gpt-oss-120b"
+  include_code: true
+  include_math: true
+
+research_sources:
+  arxiv:
+    enabled: true
+    categories: ["cs.AI", "cs.LG", "cs.CL", "cs.CV"]
+  pubmed:
+    enabled: true
+    api_key: ""
+  paperswithcode:
+    enabled: true
+  huggingface:
+    enabled: true
+    datasets_only: false

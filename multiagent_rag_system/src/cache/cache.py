@@ -228,16 +228,15 @@ class CacheClient:
             logger.error("cache_get_failed", key=key, error=str(e))
             return None
 
-    async def set(
-        self,
-        key: str,
-        value: Any,
-        ttl: int = None,
+    async def set(self, key: str,
+        value: Any, ttl: int = None,
     ) -> None:
+        
         r = await self._client()
         ttl = ttl if ttl is not None else self.cfg.ttl_seconds
         try:
             await r.setex(key, ttl, json.dumps(value, default=str))
+
         except Exception as e:
             logger.error("cache_set_failed", key=key, error=str(e))
 
@@ -246,12 +245,12 @@ class CacheClient:
         try:
             await r.delete(key)
         except Exception:
-            pass  # deletion failure is non-fatal
+            pass
 
 
     #Rate limiter (incr-based counter)
     async def check_rate_limit(self, identifier: str) -> tuple[bool, int]:
-        """Returns (allowed, remaining). Config comes from settings.rate_limit."""
+        """Returns (allowed, remaining)."""
         r   = await self._client()
         key = _rate_limit_key(identifier)
         try:
@@ -295,10 +294,11 @@ class CacheClient:
             return []
 
     #Health
-
     async def ping(self) -> float:
         """Ping Redis and return round-trip latency in milliseconds."""
         r  = await self._client()
+        if r is None:
+            raise ConnectionError("Redis not available")
         try:
             t0 = time.perf_counter()
             await r.ping()

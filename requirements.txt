@@ -29,7 +29,7 @@ langgraph
 langchain
 langchain_text_splitters
 qdrant_client
-fitz
+pymupdf
 easyocr
 python-docx
 python-pptx
@@ -41,3 +41,9 @@ langsmith
 pypdf
 pymupdf
 transformers
+arxiv
+arxiv==2.1.0
+huggingface_hub==0.24.0
+apscheduler==3.10.4
+redis[hiredis]
+crawl4ai
