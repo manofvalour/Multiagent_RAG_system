@@ -64,17 +64,17 @@ class RAGOrchestrator:
         t_total = time.perf_counter()
         trace: list[AgentEvent] = []
 
-        # 1.Cache check — return immediately on hit
+        #Cache check — return immediately on hit
         cached = await self.cache.get(query.query)
         if cached:
             cached.latency_ms = round((time.perf_counter() - t_total) * 1000, 2)
             logger.info(f"[Orchestrator] cache HIT  latency={cached.latency_ms:.0f}ms")
             return cached
 
-        # 2.Query expansion (HyDE / multi-query)
+        #Query expansion (HyDE / multi-query)
         expanded_queries, _ = await self.expansion.expand(query)
 
-        # 3. Multi-query retrieval + dedup
+        #Multi-query retrieval + dedup
         filters = query.filters or None
         retrieved, ev = await self.retriever.retrieve(expanded_queries, filters=filters)
         trace.append(ev)

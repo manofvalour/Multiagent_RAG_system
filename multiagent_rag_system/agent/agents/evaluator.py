@@ -21,22 +21,14 @@ class RAGASEvaluator:
    """
 
     def __init__(self) -> None:
-        # Pull evaluation sub-config from the merged Settings object.
-        # settings.evaluation is an EvaluationConfig with .enabled and .sample_rate
         self.cfg      = settings.evaluation
         self.settings = settings
 
-    async def evaluate(
-        self,
-        query:str,
-        answer:str,
-        chunks:list[RerankedChunk],
+    async def evaluate(self, query:str,
+        answer:str, chunks:list[RerankedChunk],
         ground_truth:Optional[str] = None,
     ) -> Optional[RAGASScores]:
         """
-        Runs the blocking RAGAS evaluate() in a thread pool so it
-        never blocks the asyncio event loop.
-
         Returns RAGASScores if evaluation ran, None if skipped or failed.
         """
 
@@ -51,7 +43,7 @@ class RAGASEvaluator:
         if scores:
             logger.info("[RAGAS] faithfulness={faithfulness} "
                         "relevancy={relevancy} "
-                "precision={precision}".format(
+                        "precision={precision}".format(
                     faithfulness=scores.faithfulness,
                     relevancy=scores.answer_relevancy,
                     precision=scores.context_precision,
@@ -65,8 +57,6 @@ class RAGASEvaluator:
     ) -> Optional[RAGASScores]:
         """
         Synchronous RAGAS execution — always called inside run_in_executor.
-
-        RAGAS makes its own LLM calls internally.
         """
         try:
             import os
@@ -76,7 +66,7 @@ class RAGASEvaluator:
             from datasets import Dataset
             from ragas import evaluate
             from ragas.metrics import (
-                answer_relevancy,
+                answer_relevance,
                 context_precision,
                 context_recall,
                 faithfulness,
@@ -89,12 +79,12 @@ class RAGASEvaluator:
             data: dict = {
                 "question": [query],
                 "answer":   [answer],
-                "contexts": [contexts],  # list of lists: [[passage1, passage2, ...]]
+                "contexts": [contexts],  # list of lists
             }
 
             # context_recall requires a reference answer to compare against.
             # Only add it when ground_truth was provided by the caller.
-            metrics = [faithfulness, answer_relevancy, context_precision]
+            metrics = [faithfulness, answer_relevance, context_precision]
             if ground_truth:
                 data["ground_truth"] = [ground_truth]
                 metrics.append(context_recall)

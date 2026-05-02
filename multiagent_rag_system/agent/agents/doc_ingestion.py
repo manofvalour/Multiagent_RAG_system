@@ -14,6 +14,7 @@ import uuid
 from pathlib import Path
 import sys
 from langsmith import traceable
+from typing import Any, Optional
 
 import numpy as np
 from langchain_text_splitters import Language, RecursiveCharacterTextSplitter
@@ -47,7 +48,6 @@ def detect_content_type(text: str) -> ContentType:
         return ContentType.MARKDOWN
     return ContentType.PROSE
 
-
 #File parser
 class FileParser:
     """
@@ -60,10 +60,17 @@ class FileParser:
     Text : direct UTF-8 decode
     """
 
-    async def parse(self, content: bytes, filename: str) -> tuple[str, ContentType]:
+    async def parse(self, filename:str, 
+                    url:Optional[str]= None,
+                    content: Optional[bytes]=None) -> tuple[str, ContentType]:
+        
         ext = Path(filename).suffix.lower()
         if ext == ".pdf":
-            return await self._parse_pdf(content)
+            if url:
+                return await self._parse_pdf(url)
+            else:
+                return await self._parse_pdf(content)
+            
         elif ext == ".docx":
             return self._parse_docx(content), ContentType.DOCX
         elif ext == ".pptx":
@@ -76,14 +83,22 @@ class FileParser:
             text = content.decode("utf-8", errors="replace")
             return text, detect_content_type(text)
 
-    async def _parse_pdf(self, content: bytes) -> tuple[str, ContentType]:
+    async def _parse_pdf(self, content: Optional[bytes]=None, 
+                         url:Optional[str]=None) -> tuple[str, ContentType]:
         try:
             pages_text: list[str] = []
             needs_ocr:  list[int] = []
 
             try:
                 import pypdf
-                reader = pypdf.PdfReader(io.BytesIO(content))
+                import requests
+
+                if url:
+                    response = requests.get(url)
+                    reader = pypdf.PdfReader(io.BytesIO(response.content))
+                else:
+                    reader = pypdf.PdfReader(io.BytesIO(content))
+
                 for i, page in enumerate(reader.pages):
                     text = page.extract_text() or ""
                     if len(text.strip()) >= 50:

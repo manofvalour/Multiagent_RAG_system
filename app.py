@@ -9,6 +9,8 @@ import time
 import uuid
 from contextlib import asynccontextmanager
 from typing import Optional
+import datetime
+import json
 
 from fastapi import FastAPI, HTTPException, Request, Response, Depends, Header, status, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
@@ -20,18 +22,14 @@ import os
 
 from multiagent_rag_system.agent.agents.doc_ingestion import DocumentIngestionPipeline
 from multiagent_rag_system.agent.pipeline.pipeline import RAGOrchestrator
-from multiagent_rag_system.agent.agents.paper_reader_agent import PaperReaderAgent
-from multiagent_rag_system.src.fetcher.paper_fetcher_service import PaperFetcherService
 from multiagent_rag_system.src.cache.cache import CacheClient
 from multiagent_rag_system.src.utils.config_loader import get_settings
 from multiagent_rag_system.src.logger import GLOBAL_LOGGER as logger
 from multiagent_rag_system.src.models.models import (
     HealthComponent, HealthResponse, IngestRequest, IngestResponse,
-    QueryRequest, QueryResponse, QueryMetrics,
-    PaperSource, PaperMetadata, PaperAnalysis, PaperSearchRequest,
-    PaperSearchResponse, DocumentChunk,
+    QueryRequest, QueryResponse, QueryMetrics, DocumentChunk,
 )
-from multiagent_rag_system.src.database.vector_store import get_vector_store, get_paper_vector_store
+from multiagent_rag_system.src.database.vector_store import get_vector_store
 from multiagent_rag_system.src.embedding.embedding import get_embedder
 from multiagent_rag_system.src.utils.metrics import (
     get_metrics_output, record_ingestion, record_query, 
@@ -50,8 +48,6 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 _pipeline: Optional[RAGOrchestrator] = None
 _ingestion: Optional[DocumentIngestionPipeline] = None
 _cache: Optional[CacheClient] = None
-_paper_fetcher: Optional[PaperFetcherService] = None
-_paper_reader: Optional[PaperReaderAgent] = None
 _start_time: float = 0.0
 
 
@@ -66,14 +62,11 @@ async def lifespan(app: FastAPI):
     # Warm up embedder and vector store
     await get_embedder()
     await get_vector_store()
-    await get_paper_vector_store()
 
     # Initialize singletons once here (not at module level)
     _pipeline  = RAGOrchestrator()
     _ingestion = DocumentIngestionPipeline()
     _cache     = CacheClient()
-    _paper_fetcher = PaperFetcherService()
-    _paper_reader = PaperReaderAgent()
 
     logger.info("startup_complete")
     yield
@@ -194,6 +187,20 @@ async def ingest_file(file: UploadFile = File(...)):
     update_store_size(await store.count())
     return result
 
+@app.get("/documents", response_model=list[str])
+async def get_documents():
+    """
+    Retrieve the list of all unique document ids in the vector store
+    """
+    _store = await get_vector_store()
+    try:
+        doc_ids = await _store.get_all_document_ids()
+        return doc_ids
+
+    except Exception as e:
+        logger.error(f"Error fetching documents: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
 
 @app.delete("/documents/{doc_id}")
 async def delete_document(doc_id: str):
@@ -252,11 +259,55 @@ async def metrics():
     """Prometheus metrics endpoint."""
     return PlainTextResponse(get_metrics_output(), media_type="text/plain; version=0.0.4")
 
+def _normalize_history_item(item):
+    if isinstance(item, (bytes, bytearray)):
+        item = item.decode("utf-8")
+    if isinstance(item, str):
+        try:
+            item = json.loads(item)
+        except json.JSONDecodeError:
+            return {}
+    return item or {}
+
+
+def _parse_history_timestamp(entry):
+    timestamp = entry.get("timestamp") or entry.get("created_at") or entry.get("ts")
+    if timestamp is None:
+        return None
+
+    if isinstance(timestamp, (int, float)):
+        return datetime.datetime.fromtimestamp(datetime.timezone.utc)
+
+    if isinstance(timestamp, str):
+        iso = timestamp.strip()
+        for fmt in ("%Y-%m-%dT%H:%M:%S.%fZ", "%Y-%m-%dT%H:%M:%S.%f", "%Y-%m-%dT%H:%M:%SZ",
+                    "%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M:%S.%f"):
+            try:
+                return datetime.strptime(iso, fmt)
+            except ValueError:
+                pass
+        try:
+            return datetime.datetime.fromisoformat(iso.replace("Z", "+00:00")).astimezone(tz=None).replace(tzinfo=None)
+        except ValueError:
+            pass
+
+    return None
+
 
 @app.get("/analytics", response_model=QueryMetrics)
 async def analytics(window_minutes: int = 60):
     """Query performance and hallucination analytics over rolling window."""
-    history = await _cache.lrange("rag:history", 0, 999)
+    raw_history = await _cache.lrange("rag:history", 0, 999)
+    history = [_normalize_history_item(item) for item in raw_history]
+
+    cutoff = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(minutes=window_minutes)
+    filtered_history = []
+    for item in history:
+        ts = _parse_history_timestamp(item)
+        if ts is None or ts >= cutoff:
+            filtered_history.append(item)
+
+    history = filtered_history
 
     if not history:
         return QueryMetrics(
@@ -268,7 +319,7 @@ async def analytics(window_minutes: int = 60):
     confidences = [h.get("confidence", {}).get("final", 0) for h in history]
     latencies   = [h.get("latency_ms", 0) for h in history]
     risks       = [h.get("hallucination_risk", "MEDIUM") for h in history]
-    cached_hits  = sum(1 for h in history if h.get("cached"))
+    cached_hits = sum(1 for h in history if h.get("cached"))
 
     source_counts: dict[str, int] = {}
     for h in history:
@@ -294,101 +345,6 @@ async def analytics(window_minutes: int = 60):
         cache_hit_rate=round(cached_hits / max(len(history), 1), 3),
         top_sources=top_sources,
     )
-
-
-# ─── Paper Reader Endpoints ────────────────────────────────────────────────────
-
-@app.get("/papers/search", response_model=PaperSearchResponse)
-async def search_papers(
-    q: str,
-   # sources: list[str]= ["arxiv"],
-    max_results: int = 10,
-    topic_filter: Optional[str] = None,
-):
-    """Search for research papers across multiple sources."""
-    #source_list = [PaperSource(s.strip()) for s in sources.split(",")]
-
-    papers = await _paper_fetcher.fetch_arxiv_papers(q, max_results)
-
-    return PaperSearchResponse(papers=papers, total=len(papers))
-
-
-@app.get("/papers/{paper_id}", response_model=PaperMetadata)
-async def get_paper(paper_id: str):
-    """Get paper metadata by ID. Checks cache, then vector store."""
-    # Try cache
-    cached = await _cache.get(f"paper:{paper_id}")
-    if cached:
-        return PaperMetadata(**cached)
-
-    # Try to get from paper vector store
-    try:
-        store = await get_paper_vector_store()
-        results = await store.search_paper_by_id(paper_id)
-        if results:
-            return results[0]
-    except Exception:
-        pass
-
-    raise HTTPException(status_code=404, detail=f"Paper {paper_id} not found")
-
-
-@app.post("/papers/{paper_id}/read", response_model=PaperAnalysis)
-async def read_paper(
-    paper_id: str,
-    include_math: bool = True,
-    include_code: bool = True,
-):
-    """Full AI-powered paper reading with intuition, math, and code breakdown."""
-    # Get paper metadata
-    paper = await get_paper(paper_id)
-
-    # Scrape PDF content for this single paper
-    if paper.pdf_url:
-        content = await _paper_fetcher.scrape_paper_pdf(paper.pdf_url)
-    else:
-        content = None
-
-    # Build chunks from scraped content (split into sections)
-    chunks = []
-    if content:
-        # Simple chunking: split on double newlines or by character count
-        sections = content.split('\n\n')
-        for i, section in enumerate(sections):
-            if len(section.strip()) > 50:  # Skip tiny sections
-                chunks.append(DocumentChunk(
-                    id=str(uuid.uuid4()),
-                    doc_id=f"paper-{paper_id}",
-                    content=section.strip()[:2000],  # Cap at 2000 chars per chunk
-                    chunk_index=i,
-                ))
-
-    # If no content from PDF, fall back to abstract as single chunk
-    if not chunks and paper.abstract:
-        chunks.append(DocumentChunk(
-            id=str(uuid.uuid4()),
-            doc_id=f"paper-{paper_id}",
-            content=paper.abstract,
-            chunk_index=0,
-        ))
-
-    # Run paper reader agent
-    analysis, event = await _paper_reader.run(
-        paper=paper,
-        chunks=chunks,
-        include_math=include_math,
-        include_code=include_code,
-    )
-
-    # Cache analysis result
-    await _cache.set(
-        f"paper:analysis:{paper_id}",
-        analysis.model_dump_json(),
-        ex=86400,
-    )
-
-    return analysis
-
 
 @app.get("/")
 async def root():

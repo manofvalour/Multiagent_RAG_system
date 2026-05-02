@@ -180,7 +180,7 @@ class OTelConfig(BaseModel):
     enable_tracing: bool = True
 
     @model_validator(mode="after")
-    def warn_if_localhost_in_production(self) -> "OTelConfig":
+    def warn_if_localhost_in_production(self) -> OTelConfig:
         import os
         if (
             os.getenv("ENVIRONMENT") == "production"
