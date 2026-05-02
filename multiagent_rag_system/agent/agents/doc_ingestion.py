@@ -372,7 +372,7 @@ class DocumentIngestionPipeline:
         try:
             # Prepend a short UUID so two files with the same name don't collide
             unique_name = f"{str(uuid.uuid4())[:8]}-{Path(filename).name}"
-            save_path   = Path(self.UPLOAD_DIR) / unique_name
+            save_path   = Path(self.UPLOAD_DIR)/unique_name
 
             loop = asyncio.get_event_loop()
             await loop.run_in_executor(
@@ -408,7 +408,7 @@ class DocumentIngestionPipeline:
             saved_path = await self.document_to_access(content, filename)
 
             # Parse the original bytes — no need to re-read from disk since
-            text, ct = await self.parser.parse(content, filename)
+            text, ct = await self.parser.parse(content=content, filename=filename)
 
             result = await self._process(text, ct, metadata, t0)    
             logger.info(f"File ingested successfully", source = filename, 

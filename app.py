@@ -259,16 +259,6 @@ async def metrics():
     """Prometheus metrics endpoint."""
     return PlainTextResponse(get_metrics_output(), media_type="text/plain; version=0.0.4")
 
-def _normalize_history_item(item):
-    if isinstance(item, (bytes, bytearray)):
-        item = item.decode("utf-8")
-    if isinstance(item, str):
-        try:
-            item = json.loads(item)
-        except json.JSONDecodeError:
-            return {}
-    return item or {}
-
 
 def _parse_history_timestamp(entry):
     timestamp = entry.get("timestamp") or entry.get("created_at") or entry.get("ts")
@@ -283,7 +273,7 @@ def _parse_history_timestamp(entry):
         for fmt in ("%Y-%m-%dT%H:%M:%S.%fZ", "%Y-%m-%dT%H:%M:%S.%f", "%Y-%m-%dT%H:%M:%SZ",
                     "%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M:%S.%f"):
             try:
-                return datetime.strptime(iso, fmt)
+                return datetime.datetime.strptime(iso, fmt)
             except ValueError:
                 pass
         try:
@@ -297,8 +287,8 @@ def _parse_history_timestamp(entry):
 @app.get("/analytics", response_model=QueryMetrics)
 async def analytics(window_minutes: int = 60):
     """Query performance and hallucination analytics over rolling window."""
-    raw_history = await _cache.lrange("rag:history", 0, 999)
-    history = [_normalize_history_item(item) for item in raw_history]
+    history = await _cache.lrange("rag:index", 0, -1)
+   # history = [_normalize_history_item(item) for item in raw_history]
 
     cutoff = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(minutes=window_minutes)
     filtered_history = []

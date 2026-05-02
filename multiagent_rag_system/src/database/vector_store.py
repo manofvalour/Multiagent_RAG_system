@@ -109,6 +109,16 @@ class VectorStore:
             f"m={self.config.hnsw_m}  ef_construct={self.config.hnsw_ef_construct}"
         )
 
+        try:
+            self._client.create_payload_index(
+                collection_name = self._collection_name,
+                field_name = "doc_id",
+                field_schema = "keyword",
+            )
+            logger.info(f"Payload index created on 'doc_id' (keyword)")
+        except Exception as e:
+            logger.warning(f"Failed to create payload index on 'doc_id': {e}")
+
     # Write to QDrant
 
     async def add_chunks(self, chunks: list[DocumentChunk], embeddings) -> None:
@@ -254,7 +264,6 @@ class VectorStore:
     async def delete_document(self, doc_id: str) -> int:
         """
         Delete all points belonging to doc_id using a payload filter.
-        No index rebuild — Qdrant handles this natively unlike FAISS.
         Returns number of points deleted.
         """
         loop = asyncio.get_event_loop()
@@ -283,8 +292,6 @@ class VectorStore:
         )
         logger.info(f"Deleted doc_id={doc_id!r}  removed={before}")
         return before
-
-    # ...existing code...
 
     async def get_all_document_ids(self) -> list[str]:
         """
@@ -335,7 +342,7 @@ class VectorStore:
             return sorted(list(doc_ids))  # Sort for consistent ordering
         except Exception as e:
             logger.error(f"Failed to retrieve document IDs: {e}")
-            raise
+            return []
 
     async def count(self) -> int:
         if self._client is None:
