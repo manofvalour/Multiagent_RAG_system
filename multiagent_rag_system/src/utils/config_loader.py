@@ -278,26 +278,6 @@ class JWTConfig(BaseModel):
     algorithm: str = "HS256"
     expire_minutes: int = 60
 
-
-class ArxivConfig(BaseModel):
-    """arXiv source configuration."""
-    enabled: bool = True
-    categories: list[str] = ["cs.AI", "cs.LG", "cs.CL", "cs.CV"]
-
-
-
-class ResearchSourcesConfig(BaseModel):
-    """Research paper sources configuration."""
-    arxiv: ArxivConfig = ArxivConfig()
-
-class PaperReaderConfig(BaseModel):
-    """Paper reader analysis settings."""
-    max_results: int = 10
-    analysis_model: str = "openai/gpt-oss-120b"
-    include_code: bool = True
-    include_math: bool = True
-
-
 #Root Settings
 class Settings(BaseSettings):
     """
@@ -366,8 +346,6 @@ class Settings(BaseSettings):
     observability: ObservabilityConfig = ObservabilityConfig()
     evaluation: EvaluationConfig = EvaluationConfig()
     agents: AgentConfig = AgentConfig()
-    research_sources: ResearchSourcesConfig = ResearchSourcesConfig()
-    paper_reader: PaperReaderConfig = PaperReaderConfig()
 
     #Computed properties
     @property

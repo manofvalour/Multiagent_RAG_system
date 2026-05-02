@@ -43,10 +43,8 @@ async def get_redis():
     if _redis is None:
         try:
             import redis.asyncio as aioredis
-            _redis = aioredis.from_url(
-                settings.redis_url,
-                encoding="utf-8",
-                decode_responses=True,
+            _redis = await aioredis.from_url(
+                settings.redis_url
             )
             await _redis.ping()
             logger.info("redis_connected", url=settings.redis_url)
