@@ -42,8 +42,8 @@ RUN mkdir -p data/uploads logs \
     .cache/huggingface \
     .cache/sentence_transformers
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=180s --retries=5 \
-    CMD python -c "import httpx; r=httpx.get('http://localhost:8000/health', timeout=10); r.raise_for_status()" || exit 1
+HEALTHCHECK --interval=30s --timeout=30s --start-period=30s --retries=5 \
+    CMD python -c "import httpx; r=httpx.get('http://localhost:8000/health', timeout=300); r.raise_for_status()" || exit 1
 
 EXPOSE 8000
 

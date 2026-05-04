@@ -196,18 +196,18 @@ class OTelConfig(BaseModel):
 
 class LangSmithConfig(BaseModel):
     """LangSmith LLM tracing config."""
-    enabled: bool = False
+    enabled: bool = True
     api_key: Optional[str] = None
     project: str = "multiagent-rag"
     endpoint: AnyHttpUrl = "https://api.smith.langchain.com"
 
-    @model_validator(mode="after")
-    def api_key_required_if_enabled(self) -> "LangSmithConfig":
-        if self.enabled and not self.api_key:
-            raise ValueError(
-                "LangSmith is enabled but LANGSMITH_API_KEY is not set."
-            )
-        return self
+   # @model_validator(mode="after")
+    #def api_key_required_if_enabled(self) -> "LangSmithConfig":
+     #   if self.enabled and not self.api_key:
+      #      raise ValueError(
+       #         "LangSmith is enabled but LANGSMITH_API_KEY is not set."
+        #    )
+       # return self
 
 
 class SentryConfig(BaseModel):

@@ -20,9 +20,13 @@ def _get_tracer(name: str = "rag"):
         return _tracer
     try:
         from opentelemetry import trace
+        if not get_settings().observability.otel.enabled:
+            _tracer = None
+            return None
         _tracer = trace.get_tracer(name)
         return _tracer
     except ImportError:
+        _tracer = None
         return None
 
 

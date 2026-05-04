@@ -7,6 +7,8 @@ from __future__ import annotations
 import asyncio
 import random
 from typing import Optional
+import os
+import warnings
 
 from multiagent_rag_system.src.utils.config_loader import get_settings
 from multiagent_rag_system.src.models.models import RAGASScores, RerankedChunk
@@ -17,7 +19,7 @@ settings = get_settings()
 
 class RAGASEvaluator:
     """
-    Wraps RAGAS evaluation behind two guards:
+    Wraps RAGAS evaluation behind two guards
    """
 
     def __init__(self) -> None:
@@ -36,9 +38,15 @@ class RAGASEvaluator:
             return None
 
         loop   = asyncio.get_event_loop()
-        scores = await loop.run_in_executor(
-            None, self._run, query, answer, chunks, ground_truth
-        )
+        try:
+            scores = await asyncio.wait_for(
+                loop.run_in_executor(
+                None, self._run, query, answer, chunks, 
+                ground_truth), timeout=60.0)
+        
+        except asyncio.TimeoutError:
+            logger.warning("RAGAS evaluation timed out after 60s")
+            return None
 
         if scores:
             logger.info("[RAGAS] faithfulness={faithfulness} "
@@ -59,8 +67,7 @@ class RAGASEvaluator:
         Synchronous RAGAS execution — always called inside run_in_executor.
         """
         try:
-            import os
-      
+            warnings.filterwarnings("ignore", message="resource_tracker.*")      
             os.environ["OPENAI_API_KEY"] = self.settings.active_api_key
 
             from datasets import Dataset
@@ -89,7 +96,8 @@ class RAGASEvaluator:
                 data["ground_truth"] = [ground_truth]
                 metrics.append(context_recall)
 
-            result = evaluate(Dataset.from_dict(data), metrics=metrics)
+            result = evaluate(Dataset.from_dict(data), metrics=metrics,
+                              run_config={"max_workers":1})
             df     = result.to_pandas()
 
             return RAGASScores(

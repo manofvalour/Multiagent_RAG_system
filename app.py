@@ -151,16 +151,35 @@ async def query(req: QueryRequest):
         result = await _pipeline.run(req)
 
         # Metrics
+        is_cached = getattr(result, 'cached', False)
         n_supported = sum(1 for c in result.claims if c.supported)
+        n_chunks = len(getattr(result, 'reranked_chunks', []))
         record_query(
             latency_ms=result.latency_ms,
             confidence=result.confidence.final,
             risk=result.hallucination_risk.value,
-            cached=False,
+            cached=is_cached,
             n_claims=len(result.claims),
             n_supported=n_supported,
-            n_chunks=len(result.reranked_chunks),
+            n_chunks=n_chunks,
         )
+
+        # Store analytics data in Redis for /analytics endpoint
+        analytics_entry = {
+            "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            "query": req.query,
+            "latency_ms": result.latency_ms,
+            "confidence": {"final": result.confidence.final},
+            "hallucination_risk": result.hallucination_risk.value,
+            "cached": is_cached,
+            "claims_count": len(result.claims),
+            "supported_claims": n_supported,
+            "retrieved_chunks": [
+                {"chunk": {"source": chunk.chunk.source, "text": chunk.chunk.text[:200] if chunk.chunk.text else None, "score": chunk.score}}
+                for chunk in getattr(result, 'reranked_chunks', [])
+            ],
+        }
+        await _cache.lpush_bounded("rag:index", analytics_entry, max_len=1000)
 
         return result
 
@@ -266,7 +285,7 @@ def _parse_history_timestamp(entry):
         return None
 
     if isinstance(timestamp, (int, float)):
-        return datetime.datetime.fromtimestamp(datetime.timezone.utc)
+        return datetime.datetime.fromtimestamp(timestamp, tz=datetime.timezone.utc)
 
     if isinstance(timestamp, str):
         iso = timestamp.strip()
