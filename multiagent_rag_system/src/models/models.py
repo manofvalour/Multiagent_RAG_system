@@ -45,7 +45,7 @@ class DocumentChunk(BaseModel):
     id:str = Field(default_factory=lambda:str(uuid.uuid4()))
     doc_id:str
     content: str
-    #source: str
+    source: str
     metadata: dict[str, Any] = Field(default_factory=dict)
     chunk_index: int=0
     embedding: Optional[list[float]]=None

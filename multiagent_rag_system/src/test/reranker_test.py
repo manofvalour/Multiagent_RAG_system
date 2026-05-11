@@ -18,9 +18,10 @@ def _make_doc(i: int, content: str = None) -> DocumentChunk:
     return DocumentChunk(
         id=f"aaaaaaaa-0000-0000-0000-00000000000{i}",
         content=content or f"RAG is a technique that combines retrieval and generation. Chunk {i}.",
+        source=f"doc{i}.txt",
         chunk_index=i,
         doc_id=f"doc-00{i}",
-        metadata={"source": f"doc{i}.txt"},
+        metadata={},
     )
 
 

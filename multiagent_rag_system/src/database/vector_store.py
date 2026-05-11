@@ -145,6 +145,7 @@ class VectorStore:
                 "content":      chunk.content,
                 "chunk_index":  chunk.chunk_index,
                 "doc_id":       chunk.doc_id,
+                "source":       chunk.source,
                 "metadata":     chunk.metadata,
             }
             points.append(
@@ -255,6 +256,7 @@ class VectorStore:
             content_type= ContentType(p.get("content_type", "prose")),
             page_number=  p.get("page_number"),
             doc_id=       p.get("doc_id"),
+            source=       p.get("source", ""),
             metadata=     p.get("metadata", {}),
         )
       #  logger.info(scored_point.score, min(1.0, max(0.0, float(scored_point.score))))

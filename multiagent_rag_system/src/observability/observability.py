@@ -32,10 +32,17 @@ def _get_tracer(name: str = "rag"):
 
 #OTel setup
 
-def setup_otel() -> None:
-    """Configure the OTel SDK and OTLP gRPC exporter from settings."""
+def setup_otel(use_console_exporter: bool = False, export_to_langsmith: bool = True) -> None:
+    """
+    Configure the OTel SDK and OTLP exporter from settings.
+
+    Args:
+        use_console_exporter: If True, export spans to console for debugging.
+        export_to_langsmith: If True and LangSmith is configured, export to LangSmith OTLP.
+    """
     # Read settings inside the function — avoids stale module-level evaluation
     cfg = get_settings().observability.otel
+    langsmith_cfg = get_settings().observability.langsmith
 
     if not cfg.enabled:
         logger.info("otel_disabled")
@@ -43,10 +50,35 @@ def setup_otel() -> None:
 
     try:
         from opentelemetry import trace
-        from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
         from opentelemetry.sdk.resources import Resource
         from opentelemetry.sdk.trace import TracerProvider
-        from opentelemetry.sdk.trace.export import BatchSpanProcessor
+
+        if use_console_exporter:
+            from opentelemetry.sdk.trace.export import ConsoleSpanExporter
+            from opentelemetry.sdk.trace.export import BatchSpanProcessor
+            exporter = ConsoleSpanExporter()
+            logger.info("otel_using_console_exporter")
+            endpoint = "console"
+        elif export_to_langsmith and langsmith_cfg.enabled and langsmith_cfg.api_key:
+            # Export to LangSmith via OTLP HTTP
+            from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+            from opentelemetry.sdk.trace.export import BatchSpanProcessor
+
+            langsmith_endpoint = f"{langsmith_cfg.endpoint}/v1/traces"
+            exporter = OTLPSpanExporter(
+                endpoint=langsmith_endpoint,
+                headers={"x-api-key": langsmith_cfg.api_key},
+            )
+            logger.info("otel_exporting_to_langsmith", endpoint=langsmith_endpoint)
+            endpoint = langsmith_endpoint
+        else:
+            from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+            from opentelemetry.sdk.trace.export import BatchSpanProcessor
+            exporter = OTLPSpanExporter(
+                endpoint=str(cfg.endpoint),
+                insecure=not str(cfg.endpoint).startswith("https"),  # TLS only for https
+            )
+            endpoint = str(cfg.endpoint)
 
         resource = Resource.create({
             "service.name":    cfg.service_name,
@@ -54,16 +86,13 @@ def setup_otel() -> None:
         })
 
         provider = TracerProvider(resource=resource)
-        exporter = OTLPSpanExporter(
-            endpoint=str(cfg.endpoint),
-            insecure=not str(cfg.endpoint).startswith("https"),  # TLS only for https
-        )
         provider.add_span_processor(BatchSpanProcessor(exporter))
         trace.set_tracer_provider(provider)
 
         logger.info("otel_configured",
-                    endpoint=str(cfg.endpoint),
-                    service=cfg.service_name)
+                    endpoint=str(endpoint),
+                    service=cfg.service_name,
+                    console_exporter=use_console_exporter)
 
     except ImportError:
         logger.error("otel_packages_missing",
@@ -74,24 +103,28 @@ def setup_otel() -> None:
 def setup_langsmith() -> None:
     """
     Validate LangSmith config at startup.
-    Env vars should already be set in .env — this just confirms they're present
-    and logs the active project.
     """
     import os
-    cfg = get_settings().observability.langsmith
+    settings = get_settings()
+    cfg = settings.observability.langsmith
+
+    # Get API key from Settings (already loaded from .env via pydantic_settings)
+    api_key = settings.langsmith_api_key
+    if api_key:
+        api_key = api_key.get_secret_value() if hasattr(api_key, 'get_secret_value') else str(api_key)
 
     if not cfg.enabled:
         logger.info("langsmith_disabled")
         return
 
-    if not cfg.api_key:
+    if not api_key:
         logger.info("langsmith_enabled_but_no_key",
                        message="Set LANGSMITH_API_KEY or disable LangSmith")
         return
 
     # Set env vars only if not already present — respects external configuration
     os.environ.setdefault("LANGCHAIN_TRACING_V2", "true")
-    os.environ.setdefault("LANGSMITH_API_KEY", cfg.api_key)
+    os.environ.setdefault("LANGSMITH_API_KEY", api_key)
     os.environ.setdefault("LANGCHAIN_PROJECT", cfg.project)
     os.environ.setdefault("LANGCHAIN_ENDPOINT", str(cfg.endpoint))
 

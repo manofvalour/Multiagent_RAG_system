@@ -15,7 +15,7 @@ import json
 from fastapi import FastAPI, HTTPException, Request, Response, Depends, Header, status, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, PlainTextResponse, FileResponse
-from multiagent_rag_system.src.observability.observability import setup_observability
+from multiagent_rag_system.src.observability.observability import setup_observability, setup_otel
 
 import structlog
 import os
@@ -58,6 +58,9 @@ async def lifespan(app: FastAPI):
     logger.info("startup", env=settings.environment, version=settings.app_version)
 
     setup_observability()  # Configures both OpenTelemetry and LangSmith based on settings
+    # Enable console exporter if OTEL_CONSOLE_EXPORT=true (for debugging)
+    use_console = os.getenv("OTEL_CONSOLE_EXPORT", "").lower() == "true"
+    setup_otel(use_console_exporter=use_console)
 
     # Warm up embedder and vector store
     await get_embedder()
@@ -175,7 +178,7 @@ async def query(req: QueryRequest):
             "claims_count": len(result.claims),
             "supported_claims": n_supported,
             "retrieved_chunks": [
-                {"chunk": {"source": chunk.chunk.source, "text": chunk.chunk.text[:200] if chunk.chunk.text else None, "score": chunk.score}}
+                {"chunk": {"source": chunk.chunk.source, "text": chunk.chunk.content[:200] if chunk.chunk.content else None, "score": chunk.reranker_score}}
                 for chunk in getattr(result, 'reranked_chunks', [])
             ],
         }
@@ -200,11 +203,12 @@ async def ingest_file(file: UploadFile = File(...)):
     file_content = await file.read()
     
     # Ingest the file
-    result = await _ingestion.ingest_file(content=file_content, filename=file.filename)
+    result = await _ingestion.ingest_file(content=file_content, filename=file.filename, metadata={"source": file.filename})
     record_ingestion()
     store = await get_vector_store()
     update_store_size(await store.count())
     return result
+
 
 @app.get("/documents", response_model=list[str])
 async def get_documents():
@@ -292,11 +296,15 @@ def _parse_history_timestamp(entry):
         for fmt in ("%Y-%m-%dT%H:%M:%S.%fZ", "%Y-%m-%dT%H:%M:%S.%f", "%Y-%m-%dT%H:%M:%SZ",
                     "%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M:%S.%f"):
             try:
-                return datetime.datetime.strptime(iso, fmt)
+                return datetime.datetime.strptime(iso, fmt).replace(tzinfo=datetime.timezone.utc)
             except ValueError:
                 pass
         try:
-            return datetime.datetime.fromisoformat(iso.replace("Z", "+00:00")).astimezone(tz=None).replace(tzinfo=None)
+            # Parse ISO format with timezone and normalize to UTC
+            parsed = datetime.datetime.fromisoformat(iso.replace("Z", "+00:00"))
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=datetime.timezone.utc)
+            return parsed
         except ValueError:
             pass
 

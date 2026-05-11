@@ -7,6 +7,7 @@ from __future__ import annotations
 import uuid
 import numpy as np
 import pytest
+from multiagent_rag_system.src.models.models import DocumentChunk
 
 def _norm(arr: np.ndarray) -> np.ndarray:
     """Row-wise L2 normalisation."""

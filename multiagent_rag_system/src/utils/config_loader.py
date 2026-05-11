@@ -102,9 +102,7 @@ class RerankerConfig(BaseModel):
     """Cross-encoder reranking stage."""
     enabled: bool = True
     top_n:int = 3
-    model:str = "cross-encoder/ms-marco-MiniLM-L-6-v2" #"jinaai/jina-reranker-v3"
-    #"cross-encoder/ms-marco-MiniLM-L-6-v2"
-    #"BAAI/bge-reranker-v2-m3"
+    model:str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 
 
 class QueryExpansionConfig(BaseModel):
@@ -146,13 +144,13 @@ class CacheConfig(BaseModel):
 class VectorStoreConfig(BaseModel):
     """Qdrant vector store connection and HNSW index settings."""
     # Connection — server mode when url is set, local mode when url is ""
-    url: str = os.getenv("QDRANT_ENDPOINT")
-    api_key: str = ""#os.getenv("QDRANT_API_KEY")           # override via QDRANT_API_KEY in .env
+    url: str = ""
+    api_key: str = ""
     collection_name: str = "rag_chunks"
     hnsw_m: int = 16
     hnsw_ef_construct: int = 100
     hnsw_ef: int = 128
-    local_path: str = "./data/qdrant" #"http://qdrant:6333"
+    local_path: str = "./data/qdrant" 
     timeout: int = 120  # seconds — higher for Qdrant Cloud with large upserts
 
 
@@ -172,7 +170,7 @@ class AuthConfig(BaseModel):
 
 class OTelConfig(BaseModel):
     """OpenTelemetry tracing and metrics config."""
-    enabled: bool = False
+    enabled: bool = True
     endpoint: AnyHttpUrl = "http://localhost:4317"
     service_name: str = "multiagent-rag-api"
     service_version: str = "1.0.0"
@@ -197,18 +195,9 @@ class OTelConfig(BaseModel):
 class LangSmithConfig(BaseModel):
     """LangSmith LLM tracing config."""
     enabled: bool = True
-    api_key: Optional[str] = None
-    project: str = "multiagent-rag"
+    api_key: Optional[str] = None  # Populated via ObservabilityConfig.from_env()
+    project: str = "multi_agent_rag"
     endpoint: AnyHttpUrl = "https://api.smith.langchain.com"
-
-   # @model_validator(mode="after")
-    #def api_key_required_if_enabled(self) -> "LangSmithConfig":
-     #   if self.enabled and not self.api_key:
-      #      raise ValueError(
-       #         "LangSmith is enabled but LANGSMITH_API_KEY is not set."
-        #    )
-       # return self
-
 
 class SentryConfig(BaseModel):
     """Sentry error tracking config."""
@@ -228,7 +217,7 @@ class ObservabilityConfig(BaseModel):
     sentry: SentryConfig = SentryConfig()
 
     @classmethod
-    def from_env(cls) -> "ObservabilityConfig":
+    def from_env(cls, settings: "Settings | None" = None) -> "ObservabilityConfig":
         """Build config from environment variables."""
         import os
         return cls(

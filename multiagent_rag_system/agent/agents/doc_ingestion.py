@@ -333,7 +333,8 @@ class HybridChunker:
                     content=seg,
                     chunk_index=i,
                     doc_id=metadata.get("doc_id", ""),
-                    metadata={k: v for k, v in metadata.items() if k != "doc_id"},
+                    source=metadata.get("source", ""),
+                    metadata={k: v for k, v in metadata.items() if k not in ("doc_id", "source")},
                 )
                 for i, seg in enumerate(final)
                 if seg.strip()
