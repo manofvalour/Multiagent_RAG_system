@@ -27,7 +27,9 @@ class RerankerAgent:
     def _load(self) -> None:
         if self._model is None:
             from sentence_transformers import CrossEncoder
-            self._model = CrossEncoder(self.config.model)
+
+            self._model = CrossEncoder(self.config.model
+            )
         
             logger.info(f"CrossEncoder loaded: {self.config.model}")
  

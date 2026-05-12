@@ -67,8 +67,13 @@ class RAGASEvaluator:
         Synchronous RAGAS execution — always called inside run_in_executor.
         """
         try:
-            warnings.filterwarnings("ignore", message="resource_tracker.*")      
-            os.environ["OPENAI_API_KEY"] = self.settings.active_api_key
+            warnings.filterwarnings("ignore", message="resource_tracker.*")
+            # RAGAS requires OpenAI API key for evaluation models
+            openai_key = self.settings.openai_api_key.get_secret_value()
+            if not openai_key:
+                logger.warning("RAGAS evaluation skipped: OPENAI_API_KEY not configured")
+                return None
+            os.environ["OPENAI_API_KEY"] = openai_key
 
             from datasets import Dataset
             from ragas import evaluate

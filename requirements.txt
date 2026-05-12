@@ -13,7 +13,8 @@ alembic
 tenacity
 structlog
 prometheus-client
-opentelemetry-sdk
+opentelemetry-sdk 
+opentelemetry-exporter-otlp
 opentelemetry-instrumentation-fastapi
 python-jose[cryptography]
 passlib[bcrypt]

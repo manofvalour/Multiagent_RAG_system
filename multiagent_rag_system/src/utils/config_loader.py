@@ -103,7 +103,7 @@ class RerankerConfig(BaseModel):
     enabled: bool = True
     top_n:int = 3
     model:str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
-
+            #"Alibaba-NLP/gte-reranker-modernbert-base", 
 
 class QueryExpansionConfig(BaseModel):
     """HyDE / multi-query rewriting before retrieval."""
@@ -332,7 +332,7 @@ class Settings(BaseSettings):
     cache:CacheConfig = CacheConfig()
     vector_store: VectorStoreConfig = VectorStoreConfig()
     auth: AuthConfig = AuthConfig()
-    observability: ObservabilityConfig = ObservabilityConfig()
+    observability: ObservabilityConfig = Field(default_factory=ObservabilityConfig.from_env)
     evaluation: EvaluationConfig = EvaluationConfig()
     agents: AgentConfig = AgentConfig()
 

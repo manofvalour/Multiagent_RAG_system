@@ -247,6 +247,8 @@
     color: var(--text-dim);
     cursor: default;
   }
+  a { color: var(--accent); text-decoration: none; transition: color .2s; }
+  a:hover { color: #e4d4c8; }
   ::placeholder { color: var(--muted); }
   select option { background: var(--surface-h); }
 
@@ -592,6 +594,23 @@
   ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
   ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
 
+  select {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 13px;
+    padding: 12px 16px;
+    border-radius: var(--radius);
+    outline: none;
+    transition: all .2s ease;
+    cursor: pointer;
+  }
+  select:hover { border-color: var(--muted); }
+  select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-lo); }
+  select option { background: var(--surface-h); color: var(--text); }
+
   /* ── Responsive ────────────────────────────────────── */
   @media (max-width: 680px) {
     body { grid-template-columns: 1fr; }
@@ -669,6 +688,13 @@
         <label>Max Tokens</label>
         <input type="number" id="query-tokens" value="2048" min="64" max="4096" readonly />
       </div>
+      <div class="field">
+        <label>Mode</label>
+        <select id="query-mode">
+          <option value="standard">Standard</option>
+          <option value="stream">Stream</option>
+        </select>
+      </div>
     </div>
 
     <div style="display:flex; gap:8px; margin-top:4px;">
@@ -699,6 +725,12 @@
           <div class="stat"><div class="stat-val" id="st-chunks">—</div><div class="stat-lbl">Chunks</div></div>
           <div class="stat"><div class="stat-val" id="st-claims">—</div><div class="stat-lbl">Claims</div></div>
           <div class="stat"><div class="stat-val" id="st-supported">—</div><div class="stat-lbl">Supported</div></div>
+          <div class="stat" id="st-request-id-stat" style="display:none">
+            <div class="stat-val" style="font-size:14px;" id="st-request-id">—</div>
+            <div class="stat-lbl">
+              <a href="#" onclick="viewTrace(); return false;" style="color:var(--accent); text-decoration:none;">Request ID ↗</a>
+            </div>
+          </div>
         </div>
 
         <div class="claims-section" id="claims-section">
@@ -944,6 +976,8 @@ async function runQuery() {
   hide($('query-result'));
   setLoading('query', true);
 
+  const mode = $('query-mode').value;
+
   try {
     const body = {
       query: q,
@@ -952,19 +986,73 @@ async function runQuery() {
       min_score: parseFloat($('query-minscore').value) || 0.0,
     };
 
-    const d = await apiFetch('/query', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-
-    renderQueryResult(d);
+    if (mode === 'stream') {
+      await runQueryStreaming(body);
+    } else {
+      const d = await apiFetch('/query', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      renderQueryResult(d);
+    }
   } catch(e) {
     setError('query', e.message);
   } finally {
     setLoading('query', false);
     btn.disabled = false;
   }
+}
+
+async function runQueryStreaming(body) {
+  const response = await fetch(base() + '/query/stream', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    let detail;
+    try { detail = (await response.json()).detail; } catch { detail = response.statusText; }
+    throw new Error(detail || `HTTP ${response.status}`);
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+
+  // Show response box and prepare answer area
+  show($('query-result'));
+  $('res-answer').textContent = '';
+  $('res-provider').textContent = 'streaming';
+  $('res-risk').textContent = '—';
+  $('res-latency').textContent = '…';
+  $('st-conf').textContent = '—';
+  $('st-chunks').textContent = '—';
+  $('st-claims').textContent = '—';
+  $('st-supported').textContent = '—';
+
+  let fullAnswer = '';
+  let buffer = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() || '';
+
+    for (const line of lines) {
+      if (line.startsWith('data: ')) {
+        const data = line.slice(6).trim();
+        if (data === '[DONE]') continue;
+        fullAnswer += data + ' ';
+        $('res-answer').textContent = fullAnswer.trim();
+      }
+    }
+  }
+
+  $('res-latency').textContent = 'stream complete';
 }
 
 function renderQueryResult(d) {
@@ -980,6 +1068,14 @@ function renderQueryResult(d) {
   $('st-chunks').textContent   = d.reranked_chunks?.length ?? d.chunks?.length ?? '—';
   $('st-claims').textContent   = d.claims?.length ?? '—';
   $('st-supported').textContent = d.claims ? d.claims.filter(c=>c.supported).length : '—';
+
+  // Show request_id for trace viewing
+  if (d.request_id) {
+    $('st-request-id').textContent = d.request_id.slice(0, 8) + '…';
+    $('st-request-id-stat').style.display = 'flex';
+  } else {
+    $('st-request-id-stat').style.display = 'none';
+  }
 
   // Claims
   const cl = $('claims-list');
@@ -1021,6 +1117,39 @@ function clearQuery() {
   $('query-text').value = '';
   hide($('query-result'));
   setError('query', null);
+}
+
+// ── Trace View ───────────────────────────────────────
+
+async function viewTrace() {
+  const rid = $('st-request-id').textContent;
+  if (!rid || rid === '—') return;
+
+  const traceId = rid.replace('…', '');
+  setLoading('query', true);
+
+  try {
+    const trace = await apiFetch(`/query/${traceId}/trace`);
+    const traceWindow = window.open('', '_blank');
+    if (traceWindow) {
+      traceWindow.document.write(`
+        <html><head><title>Query Trace</title>
+        <style>
+          body { font-family: monospace; padding: 20px; background: #0a0a0a; color: #f0ede8; }
+          pre { background: #131313; padding: 16px; border-radius: 8px; overflow-x: auto; }
+          h1 { font-family: serif; color: #d4c4a8; }
+        </style>
+        </head><body>
+        <h1>Query Trace</h1>
+        <pre>${JSON.stringify(trace, null, 2)}</pre>
+        </body></html>
+      `);
+    }
+  } catch(e) {
+    setError('query', 'Failed to fetch trace: ' + e.message);
+  } finally {
+    setLoading('query', false);
+  }
 }
 
 // ── Ingest Text ───────────────────────────────────────
