@@ -64,16 +64,14 @@ services:
     depends_on:
       redis:
         condition: service_healthy
-      qdrant:
-        condition: service_healthy
     restart: unless-stopped
     
     healthcheck:
       test: ["CMD", "python", "-c", "import httpx; r = httpx.get('http://localhost:8000/health', timeout=30); r.raise_for_status()"]
-      interval: 30s
-      timeout: 30s
+      interval: 10s
+      timeout: 100s
       retries: 5
-      start_period: 30s
+      start_period: 320s
     networks:
       - rag_network
 
@@ -83,7 +81,7 @@ services:
       context: .
       dockerfile: frontend/Dockerfile
     container_name: rag_frontend
-    
+
     ports:
       - "3000:80"   # host:container — nginx inside container listens on 80
     depends_on:
@@ -91,7 +89,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/health || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:80/health || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -100,28 +98,29 @@ services:
     networks:
       - rag_network
 
-  # ── Qdrant Vector Store
-  qdrant:
-    image: qdrant/qdrant:latest
-    container_name: rag_qdrant
-    
-    ports:
-      - "6333:6333"
-    environment:
-      QDRANT__SERVICE__API_KEY: ${QDRANT_API_KEY}
-    volumes:
-      - qdrant_data:/qdrant/storage
-    restart: unless-stopped
-
-    healthcheck:
-      test: ["CMD", "bash", "-c", "echo > /dev/tcp/localhost/6333"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 15s
-
-    networks:
-      - rag_network
+  # ── Qdrant Vector Store (Optional - use cloud instead)
+  # Uncomment this section if running Qdrant locally instead of cloud
+  # qdrant:
+  #   image: qdrant/qdrant:latest
+  #   container_name: rag_qdrant
+  #
+  #   ports:
+  #     - "6333:6333"
+  #   environment:
+  #     QDRANT__SERVICE__API_KEY: ${QDRANT_API_KEY}
+  #   volumes:
+  #     - qdrant_data:/qdrant/storage
+  #   restart: unless-stopped
+  #
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "wget -q --spider http://localhost:6333/readyz || curl -sf http://localhost:6333/readyz || exit 1"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+  #     start_period: 30s
+  #
+  #   networks:
+  #     - rag_network
 
   # ── Redis Cache
   redis:
@@ -138,7 +137,7 @@ services:
       - redis_data:/data
 
     ports:
-      - "6370:6379"
+      - "6379:6379"
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "--no-auth-warning", "ping"]
