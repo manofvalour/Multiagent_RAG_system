@@ -151,7 +151,7 @@ class VectorStoreConfig(BaseModel):
     hnsw_ef_construct: int = 100
     hnsw_ef: int = 128
     local_path: str = "./data/qdrant" 
-    timeout: int = 120  # seconds — higher for Qdrant Cloud with large upserts
+    timeout: int = 300  # seconds — higher for Qdrant Cloud with large upserts
 
 
 class RetrieverConfig(BaseModel):
@@ -177,19 +177,19 @@ class OTelConfig(BaseModel):
     enable_metrics: bool = True
     enable_tracing: bool = True
 
-    @model_validator(mode="after")
-    def warn_if_localhost_in_production(self) -> OTelConfig:
-        import os
-        if (
-            os.getenv("ENVIRONMENT") == "production"
-            and self.enabled
-            and "localhost" in str(self.endpoint)
-        ):
-            raise ValueError(
-                "OTel endpoint is localhost but ENVIRONMENT=production. "
-                "Set OTLP_ENDPOINT to a real collector."
-            )
-        return self
+  #  @model_validator(mode="after")
+   # def warn_if_localhost_in_production(self) -> OTelConfig:
+    #    import os
+     #   if (
+      #      os.getenv("ENVIRONMENT") == "production"
+       #     and self.enabled
+       #     and "localhost" in str(self.endpoint)
+       # ):
+        #    raise ValueError(
+         #       "OTel endpoint is localhost but ENVIRONMENT=production. "
+          #      "Set OTLP_ENDPOINT to a real collector."
+          #  )
+       # return self
 
 
 class LangSmithConfig(BaseModel):
@@ -199,22 +199,10 @@ class LangSmithConfig(BaseModel):
     project: str = "multi_agent_rag"
     endpoint: AnyHttpUrl = "https://api.smith.langchain.com"
 
-class SentryConfig(BaseModel):
-    """Sentry error tracking config."""
-    dsn: Optional[str] = None           # None means disabled, not ""
-    traces_sample_rate: float = Field(default=0.1, ge=0.0, le=1.0)
-    environment: str = "development"
-
-    @property
-    def enabled(self) -> bool:
-        return bool(self.dsn)
-
-
 class ObservabilityConfig(BaseModel):
     """Unified observability configuration."""
     otel: OTelConfig = OTelConfig()
     langsmith: LangSmithConfig = LangSmithConfig()
-    sentry: SentryConfig = SentryConfig()
 
     @classmethod
     def from_env(cls, settings: "Settings | None" = None) -> "ObservabilityConfig":
@@ -231,12 +219,7 @@ class ObservabilityConfig(BaseModel):
                 enabled=os.getenv("LANGCHAIN_TRACING_V2", "false").lower() == "true",
                 api_key=os.getenv("LANGSMITH_API_KEY"),
                 project=os.getenv("LANGCHAIN_PROJECT", "multi_agent_rag"),
-            ),
-            sentry=SentryConfig(
-                dsn=os.getenv("SENTRY_DSN") or None,
-                traces_sample_rate=float(os.getenv("SENTRY_TRACES_SAMPLE_RATE", "0.1")),
-                environment=os.getenv("ENVIRONMENT", "development"),
-            ),
+            )
         )
 
 class EvaluationConfig(BaseModel):
@@ -323,7 +306,6 @@ class Settings(BaseSettings):
 
     # ── Structured sub-configs (populated from config.yaml sections) ───────
     server: ServerConfig = ServerConfig()
-    #jwt: JWTConfig = JWTConfig()
     retriever: RetrieverConfig = RetrieverConfig()
     reranker: RerankerConfig = RerankerConfig()
     query_expansion: QueryExpansionConfig  = QueryExpansionConfig()

@@ -69,6 +69,7 @@ class VectorStore:
                     url=endpoint,
                     api_key=settings.qdrant_api_key.get_secret_value(),
                     timeout=self.config.timeout,
+                    check_compatibility=False,
                 )
             return QdrantClient(path=self.config.local_path)
 

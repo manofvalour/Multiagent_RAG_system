@@ -17,7 +17,6 @@ from langsmith import traceable
 from typing import Any, Optional
 
 import numpy as np
-from langchain_text_splitters import Language, RecursiveCharacterTextSplitter
 from sklearn.metrics.pairwise import cosine_similarity
 
 from multiagent_rag_system.src.logger import GLOBAL_LOGGER as logger
@@ -282,8 +281,10 @@ class HybridChunker:
         else:
             self._len_fn = len
 
-    def _get_splitter(self, ct: ContentType) -> RecursiveCharacterTextSplitter:
+    def _get_splitter(self, ct: ContentType) -> "RecursiveCharacterTextSplitter":
         try:
+            from langchain_text_splitters import Language, RecursiveCharacterTextSplitter
+
             if ct == ContentType.CODE:
                 logger.info("python code recursively splitted")
                 return RecursiveCharacterTextSplitter.from_language(

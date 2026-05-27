@@ -1,63 +1,52 @@
+# Git
+.git
+.gitignore
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
 # Python
-__pycache__/
+__pycache__
 *.pyc
 *.pyo
-*.pyd
-.Python
-*.egg-info/
-dist/
-build/
-.eggs/
+*.egg-info
+.eggs
+dist
+build
+*.egg
 
-# Virtual environments
-venv/
-.venv/
-env/
-.env/
+# Testing
+.pytest_cache
+.coverage
+htmlcov
+.tox
+.nox
 
-# Data and models
-data/
-*.bin
-*.pt
-*.pth
-*.gguf
-*.safetensors
+# Environment
+.env
+.env.local
+*.local
+
+# Documentation
+README.md
+CLAUDE.md
+docs/
+*.md
+
+# Docker
+docker-compose.override.yml
 
 # Logs
 logs/
 *.log
 
-# Git
-.git/
-.gitignore
+# Data
+data/uploads/
 
-# Docker
-.dockerignore
-
-# IDE
-.vscode/
-.idea/
-*.swp
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Node
-node_modules/
-
-# Uploads
-uploads/
-
-
-.git
-__pycache__/
-*.pyc
-
-.env
-.cache/
-data/
-logs/
-
-.venv/
-node_modules/
+# Cache
+.venv
+.egg-info
+.ruff_cache

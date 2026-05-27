@@ -101,20 +101,35 @@ class RAGASEvaluator:
                 data["ground_truth"] = [ground_truth]
                 metrics.append(context_recall)
 
-            result = evaluate(Dataset.from_dict(data), metrics=metrics,
-                              run_config={"max_workers":1})
+            result = evaluate(Dataset.from_dict(data), metrics=metrics)
             df     = result.to_pandas()
 
+            # Handle column name variations across RAGAS versions
+            def safe_get(col_name):
+                if col_name in df.columns:
+                    val = df[col_name].iloc[0]
+                    return float(val) if val is not None else None
+                return None
+
             return RAGASScores(
-                faithfulness= float(df["faithfulness"].iloc[0]) if "faithfulness" in df.columns else None,
-                answer_relevancy= float(df["answer_relevancy"].iloc[0]) if "answer_relevancy" in df.columns else None,
-                context_precision= float(df["context_precision"].iloc[0]) if "context_precision" in df.columns else None,
-                context_recall= float(df["context_recall"].iloc[0]) if "context_recall" in df.columns else None,
+                faithfulness=safe_get("faithfulness"),
+                answer_relevancy=safe_get("answer_relevancy") or safe_get("answer_relevance"),
+                context_precision=safe_get("context_precision"),
+                context_recall=safe_get("context_recall"),
             )
 
-        except ImportError:
-            logger.warning("ragas not installed — skipping evaluation")
+        except ImportError as ie:
+            logger.warning(f"ragas or dependencies not installed — skipping evaluation: {ie}")
             return None
         except Exception as exc:
-            logger.error(f"RAGAS evaluation failed: {exc}")
+            # Log specific error types for debugging
+            err_msg = str(exc)
+            if "OpenAI" in err_msg or "API" in err_msg.upper():
+                logger.warning(f"RAGAS evaluation skipped due to OpenAI API issue: {exc}")
+            elif "timeout" in err_msg.lower():
+                logger.warning(f"RAGAS evaluation timed out: {exc}")
+            elif "rate limit" in err_msg.lower():
+                logger.warning(f"RAGAS evaluation rate limited: {exc}")
+            else:
+                logger.error(f"RAGAS evaluation failed: {exc}")
             return None

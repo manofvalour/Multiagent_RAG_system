@@ -594,23 +594,6 @@
   ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
   ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
 
-  select {
-    width: 100%;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    color: var(--text);
-    font-family: var(--mono);
-    font-size: 13px;
-    padding: 12px 16px;
-    border-radius: var(--radius);
-    outline: none;
-    transition: all .2s ease;
-    cursor: pointer;
-  }
-  select:hover { border-color: var(--muted); }
-  select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-lo); }
-  select option { background: var(--surface-h); color: var(--text); }
-
   /* ── Responsive ────────────────────────────────────── */
   @media (max-width: 680px) {
     body { grid-template-columns: 1fr; }
@@ -687,13 +670,6 @@
       <div class="field">
         <label>Max Tokens</label>
         <input type="number" id="query-tokens" value="2048" min="64" max="4096" readonly />
-      </div>
-      <div class="field">
-        <label>Mode</label>
-        <select id="query-mode">
-          <option value="standard">Standard</option>
-          <option value="stream">Stream</option>
-        </select>
       </div>
     </div>
 
@@ -911,7 +887,14 @@
 // ── Utilities ─────────────────────────────────────────
 
 const $ = id => document.getElementById(id);
-const base = () => '/api'.replace(/\/$/, '');
+const API_BASE = (() => {
+  // Try to get from environment, fallback to relative path
+  if (window.ENV?.API_URL) return window.ENV.API_URL;
+  // In production with nginx reverse proxy, API is at /api
+  // Otherwise, assume same host:port as current page
+  return '/api'.replace(/\/$/, '');
+})();
+const base = () => API_BASE;
 
 function show(el, cls='visible') { el.classList.add(cls); }
 function hide(el, cls='visible') { el.classList.remove(cls); }
@@ -976,8 +959,6 @@ async function runQuery() {
   hide($('query-result'));
   setLoading('query', true);
 
-  const mode = $('query-mode').value;
-
   try {
     const body = {
       query: q,
@@ -986,73 +967,19 @@ async function runQuery() {
       min_score: parseFloat($('query-minscore').value) || 0.0,
     };
 
-    if (mode === 'stream') {
-      await runQueryStreaming(body);
-    } else {
-      const d = await apiFetch('/query', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-      renderQueryResult(d);
-    }
+    const d = await apiFetch('/query', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    renderQueryResult(d);
+
   } catch(e) {
     setError('query', e.message);
   } finally {
     setLoading('query', false);
     btn.disabled = false;
   }
-}
-
-async function runQueryStreaming(body) {
-  const response = await fetch(base() + '/query/stream', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-
-  if (!response.ok) {
-    let detail;
-    try { detail = (await response.json()).detail; } catch { detail = response.statusText; }
-    throw new Error(detail || `HTTP ${response.status}`);
-  }
-
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-
-  // Show response box and prepare answer area
-  show($('query-result'));
-  $('res-answer').textContent = '';
-  $('res-provider').textContent = 'streaming';
-  $('res-risk').textContent = '—';
-  $('res-latency').textContent = '…';
-  $('st-conf').textContent = '—';
-  $('st-chunks').textContent = '—';
-  $('st-claims').textContent = '—';
-  $('st-supported').textContent = '—';
-
-  let fullAnswer = '';
-  let buffer = '';
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split('\n');
-    buffer = lines.pop() || '';
-
-    for (const line of lines) {
-      if (line.startsWith('data: ')) {
-        const data = line.slice(6).trim();
-        if (data === '[DONE]') continue;
-        fullAnswer += data + ' ';
-        $('res-answer').textContent = fullAnswer.trim();
-      }
-    }
-  }
-
-  $('res-latency').textContent = 'stream complete';
 }
 
 function renderQueryResult(d) {
@@ -1087,7 +1014,9 @@ function renderQueryResult(d) {
       div.innerHTML = `<span class="claim-icon">${c.supported ? '✓' : '✗'}</span><span class="claim-text">${escHtml(c.claim || c.text || '')}</span>`;
       cl.appendChild(div);
     });
-    show($('claims-section'), 'block'); $('claims-section').style.display='block';
+    // Reset and use show() for consistency
+    $('claims-section').style.display = '';
+    show($('claims-section'), 'block');
   } else {
     $('claims-section').style.display='none';
   }
@@ -1117,39 +1046,6 @@ function clearQuery() {
   $('query-text').value = '';
   hide($('query-result'));
   setError('query', null);
-}
-
-// ── Trace View ───────────────────────────────────────
-
-async function viewTrace() {
-  const rid = $('st-request-id').textContent;
-  if (!rid || rid === '—') return;
-
-  const traceId = rid.replace('…', '');
-  setLoading('query', true);
-
-  try {
-    const trace = await apiFetch(`/query/${traceId}/trace`);
-    const traceWindow = window.open('', '_blank');
-    if (traceWindow) {
-      traceWindow.document.write(`
-        <html><head><title>Query Trace</title>
-        <style>
-          body { font-family: monospace; padding: 20px; background: #0a0a0a; color: #f0ede8; }
-          pre { background: #131313; padding: 16px; border-radius: 8px; overflow-x: auto; }
-          h1 { font-family: serif; color: #d4c4a8; }
-        </style>
-        </head><body>
-        <h1>Query Trace</h1>
-        <pre>${JSON.stringify(trace, null, 2)}</pre>
-        </body></html>
-      `);
-    }
-  } catch(e) {
-    setError('query', 'Failed to fetch trace: ' + e.message);
-  } finally {
-    setLoading('query', false);
-  }
 }
 
 // ── Ingest Text ───────────────────────────────────────
@@ -1289,6 +1185,8 @@ async function loadDocumentList() {
 
 // New: Helper to delete by ID from list
 async function deleteDocById(docId) {
+  // Escape quotes to prevent XSS in onclick handler
+  const safeId = escHtml(docId).replace(/'/g, "\\'");
   $('delete-doc-id').value = docId; // Populate input for consistency
   await deleteDoc();
 }
@@ -1379,6 +1277,16 @@ async function loadAnalytics() {
     setLoading('analytics', false);
   }
 }
+// ── Trace Viewer ─────────────────────────────────────
+
+function viewTrace() {
+  const requestId = $('st-request-id').textContent;
+  if (requestId && requestId !== '—') {
+    // In production, integrate with LangSmith/OpenTelemetry dashboard
+    alert(`View trace for request: ${requestId}\n\nIntegrate with your observability platform to enable full trace viewing.`);
+  }
+}
+
 // ── Helpers ───────────────────────────────────────────
 
 function escHtml(s) {

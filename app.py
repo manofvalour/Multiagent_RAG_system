@@ -169,7 +169,6 @@ async def query(req: QueryRequest):
 
         # Store analytics data in Redis for /analytics endpoint
         analytics_entry = {
-            "request_id": req.id,
             "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
             "query": req.query,
             "latency_ms": result.latency_ms,
@@ -178,7 +177,6 @@ async def query(req: QueryRequest):
             "cached": is_cached,
             "claims_count": len(result.claims),
             "supported_claims": n_supported,
-            "agent_trace": result.agent_trace if req.include_trace else [],
             "retrieved_chunks": [
                 {"chunk": {"source": chunk.chunk.source, "text": chunk.chunk.content[:200] if chunk.chunk.content else None, "score": chunk.reranker_score}}
                 for chunk in getattr(result, 'reranked_chunks', [])
@@ -186,46 +184,7 @@ async def query(req: QueryRequest):
         }
         await _cache.lpush_bounded("rag:index", analytics_entry, max_len=1000)
 
-        # Store trace separately for fast lookup by request_id
-        if req.include_trace and result.agent_trace:
-            await _cache.set(f"rag:trace:{req.id}", {"request_id": req.id, "agent_trace": result.agent_trace}, ttl=86400)
-
         return result
-
-
-@app.post("/query/stream")
-async def query_stream(req: QueryRequest):
-    """
-    Stream the RAG pipeline response using Server-Sent Events (SSE).
-
-    Yields tokens as they are generated, providing real-time feedback.
-    """
-    async def event_generator():
-        async for chunk in _pipeline.run_streaming(req):
-            yield chunk
-
-    return StreamingResponse(event_generator(), media_type="text/event-stream")
-
-
-@app.get("/query/{request_id}/trace")
-async def get_query_trace(request_id: str):
-    """
-    Retrieve the full agent trace for a previously executed query.
-
-    Returns detailed timing, agent events, and provenance information.
-    """
-    # Try to get from cache first (trace is stored with 24h TTL)
-    cached = await _cache.get(f"rag:trace:{request_id}")
-    if cached:
-        return cached
-
-    # Otherwise, try to get from recent analytics
-    history = await _cache.lrange("rag:index", 0, 100)
-    for item in history:
-        if item.get("request_id") == request_id or item.get("id") == request_id:
-            return {"request_id": request_id, "agent_trace": item.get("agent_trace", [])}
-
-    raise HTTPException(status_code=404, detail=f"Query trace not found for request_id: {request_id}")
 
 
 @app.post("/ingest_text", response_model=IngestResponse, status_code=status.HTTP_201_CREATED)
@@ -316,37 +275,6 @@ async def health():
         components=components,
         uptime_s=round(time.perf_counter() - _start_time, 1),
     )
-
-
-@app.get("/health/live", status_code=status.HTTP_200_OK)
-async def liveness():
-    """
-    Kubernetes liveness probe.
-    Returns 200 if the application is running.
-    """
-    return {"status": "alive", "uptime_s": round(time.perf_counter() - _start_time, 1)}
-
-
-@app.get("/health/ready")
-async def readiness():
-    """
-    Kubernetes readiness probe.
-    Checks that all dependencies (Redis, Qdrant, LLM) are available.
-    """
-    # Check Redis
-    try:
-        await _cache.ping()
-    except Exception:
-        raise HTTPException(status_code=503, detail="Redis not ready")
-
-    # Check Vector Store
-    try:
-        store = await get_vector_store()
-        await store.count()
-    except Exception:
-        raise HTTPException(status_code=503, detail="Vector store not ready")
-
-    return {"status": "ready"}
 
 
 @app.get("/metrics", response_class=PlainTextResponse, include_in_schema=False)

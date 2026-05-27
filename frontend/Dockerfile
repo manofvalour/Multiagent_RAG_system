@@ -4,7 +4,7 @@ FROM nginx:alpine
 # Remove default nginx config
 RUN rm -rf /etc/nginx/conf.d/*
 
-# Copy nginx configuration
+# Copy nginx configuration (build context is project root)
 COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
 
 # Copy static frontend file
