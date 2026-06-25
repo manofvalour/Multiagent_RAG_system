@@ -101,7 +101,7 @@ class LLMProviderConfig(BaseModel):
 class RerankerConfig(BaseModel):
     """Cross-encoder reranking stage."""
     enabled: bool = True
-    top_n:int = 3
+    top_n:int = 5
     model:str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
             #"Alibaba-NLP/gte-reranker-modernbert-base", 
 
