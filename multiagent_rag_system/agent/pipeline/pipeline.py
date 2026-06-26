@@ -141,53 +141,79 @@ class RAGOrchestrator:
     async def run_streaming(self, query: QueryRequest) -> AsyncIterator[str]:
         """
         Streaming pipeline — yields SSE-formatted strings.
-        Format: "data: <token>\\n\\n"  ...  "data: [DONE]\\n\\n"
+        Format: "data: <token>\\n\\n"  ...  "data: <json_meta>\\n\\n"  "data: [DONE]\\n\\n"
+        The second-to-last event is a JSON blob with full response metadata (claims, confidence, etc).
         """
+        t_total = time.perf_counter()
+        trace: list[AgentEvent] = []
+
         # Cache hit: stream the cached answer word-by-word
         cached = await self.cache.get(query.query)
         if cached:
             for word in cached.answer.split():
                 yield f"data: {word} \n\n"
+            yield f"data: {cached.model_dump_json()}\n\n"
             yield "data: [DONE]\n\n"
             return
 
         # Expand → retrieve → rerank (same as non-streaming)
         expanded_queries, _ = await self.expansion.expand(query)
         filters = query.filters or None
-        retrieved = await self.retriever.retrieve(expanded_queries, filters=filters)
+        retrieved, ev = await self.retriever.retrieve(expanded_queries, filters=filters)
+        trace.append(ev)
 
         if not retrieved:
             yield "data: I could not find relevant information.\n\n"
             yield "data: [DONE]\n\n"
             return
 
-        reranked = await self.reranker.rerank(query, retrieved)
+        reranked, ev = await self.reranker.rerank(query.query, retrieved)
+        trace.append(ev)
 
-        # Stream tokens
-        token_stream = await self.consensus.run(query.query, reranked)
-        full_tokens: list[str] = []
+        # Generate (stream tokens)
+        answer, _, ev = await self.consensus.run(query.query, reranked)
+        trace.append(ev)
 
-        if isinstance(token_stream, str):
-            yield f"data: {token_stream}\n\n"
-            full_tokens = [token_stream]
-        else:
-            async for token in token_stream:
-                yield f"data: {token}\n\n"
-                full_tokens.append(token)
+        if not isinstance(answer, str):
+            answer = "".join([tok async for tok in answer])
 
-        yield "data: [DONE]\n\n"
+        token_words = answer.split()
+        for word in token_words:
+            yield f"data: {word} \n\n"
 
-        # Post-stream: cache + evaluate
-        answer  = "".join(full_tokens)
-      #  sources = list(dict.fromkeys(c.chunk.source for c in reranked))
+        # Claim verification and confidence scoring
+        claims, ev_claims = await self.claim_verifier.run(answer, reranked)
+        trace.append(ev_claims)
+
+        confidence_score, hallucination_risk, ev_score = await self.confidence_scorer.run(answer, claims, reranked)
+        trace.append(ev_score)
+
+        # Build full response
         response = QueryResponse(
-            query_id=query.id,
+            request_id=query.id,
+            query=query.query,
             answer=answer,
+            claims=claims,
             retrieved_chunks=retrieved,
             reranked_chunks=reranked,
             expanded_queries=expanded_queries,
+            confidence=confidence_score,
+            hallucination_risk=hallucination_risk,
+            latency_ms=round((time.perf_counter() - t_total) * 1000, 2),
+            agent_trace=trace if query.include_trace else [],
         )
+
+        # Yield metadata as JSON SSE event, then done
+        yield f"data: {response.model_dump_json()}\n\n"
+        yield "data: [DONE]\n\n"
+
+        # Post-stream: cache + fire-and-forget evaluation
         await self.cache.set(query.query, response)
         asyncio.create_task(
             self.evaluator.evaluate(query.query, answer, reranked)
+        )
+
+        logger.info(
+            f"[Orchestrator] streamed  retrieved={len(retrieved)} | reranked={len(reranked)}  "
+            f"expanded={len(expanded_queries)} | latency={response.latency_ms:.0f}ms"
         )

@@ -13,7 +13,6 @@ import time
 import uuid
 from pathlib import Path
 import sys
-from langsmith import traceable
 from typing import Any, Optional
 
 import numpy as np
@@ -388,7 +387,6 @@ class DocumentIngestionPipeline:
             logger.error("Failed to save uploaded file", filename=filename, error=str(e))
             raise MulitagentragException("Failed to save uploaded file", error_details=str(e))
 
-    @traceable(name="Document Ingestion Agent ingest text")
     async def ingest_text(self, req: IngestRequest) -> IngestResponse:
         try:
             t0 = time.perf_counter()
@@ -401,7 +399,6 @@ class DocumentIngestionPipeline:
             logger.error("Failed to parse the text file", error = str(e))
             raise MulitagentragException("Failed to parse and ingest text doc", error_details= str(e))
         
-    @traceable(name="Document Ingestion Agent ingest file")
     async def ingest_file(self, content: bytes, filename: str, metadata: dict = {}) -> IngestResponse:
         try:
             t0 = time.perf_counter()
