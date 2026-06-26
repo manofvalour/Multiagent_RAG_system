@@ -7,6 +7,7 @@ from __future__ import annotations
 import uuid
 import numpy as np
 import pytest
+import pytest_asyncio
 from multiagent_rag_system.src.models.models import DocumentChunk
 
 def _norm(arr: np.ndarray) -> np.ndarray:
@@ -53,30 +54,34 @@ def isolated_settings(monkeypatch, tmp_path):
     Patch the shared Settings singleton so every test gets:
       - its own on-disk Qdrant directory  (prevents cross-test data bleed)
       - its own collection name           (prevents schema conflicts)
-      - local mode (qdrant_url = "")      (no Docker required)
+      - local mode (qdrant_endpoint = "") (no Docker required)
 
     We patch the attributes on the already-cached Settings instance because
     `frozen=True` is set — we temporarily lift that by patching __setattr__.
     """
     from ..utils.config_loader import get_settings
-    s = get_settings().vector_store
-    emb = get_settings().embeddings
+    from pydantic import SecretStr
+    s = get_settings()
+    vs = s.vector_store
+    emb = s.embeddings
 
     collection = f"test_{uuid.uuid4().hex[:8]}"
     qdrant_path = str(tmp_path / "qdrant")
 
-    monkeypatch.setattr(s, "url", "", raising=False)
-    monkeypatch.setattr(s, "local_path", qdrant_path, raising=False)
-    monkeypatch.setattr(s, "collection_name", collection, raising=False)
-    monkeypatch.setattr(s, "hnsw_m", 8, raising=False)
-    monkeypatch.setattr(s, "hnsw_ef_construct", 40, raising=False)
-    monkeypatch.setattr(s, "hnsw_ef", 64, raising=False)
+    # Force local mode by clearing qdrant_endpoint
+    monkeypatch.setattr(s, "qdrant_endpoint", SecretStr(""), raising=False)
+    monkeypatch.setattr(vs, "url", "", raising=False)
+    monkeypatch.setattr(vs, "local_path", qdrant_path, raising=False)
+    monkeypatch.setattr(vs, "collection_name", collection, raising=False)
+    monkeypatch.setattr(vs, "hnsw_m", 8, raising=False)
+    monkeypatch.setattr(vs, "hnsw_ef_construct", 40, raising=False)
+    monkeypatch.setattr(vs, "hnsw_ef", 64, raising=False)
     monkeypatch.setattr(emb, "embedding_dim", DIM, raising=False)
 
-    return s
+    return vs
 
 
-@pytest.fixture()
+@pytest_asyncio.fixture()
 async def store(isolated_settings):
     """
     A fully connected VectorStore backed by an isolated in-process Qdrant.

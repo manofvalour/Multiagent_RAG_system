@@ -32,6 +32,7 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile
+    image: ghcr.io/placeholder/rag-api:latest
     container_name: rag_api
   
     ports:
@@ -44,6 +45,7 @@ services:
       GROQ_API_KEY:       ${GROQ_API_KEY}
       ANTHROPIC_API_KEY:  ${ANTHROPIC_API_KEY:-}
       OPENAI_API_KEY:     ${OPENAI_API_KEY:-}
+      HF_TOKEN:           ${HF_TOKEN:-}
       REDIS_PASSWORD:     ${REDIS_PASSWORD}
       QDRANT_ENDPOINT:    ${QDRANT_ENDPOINT:-http://qdrant:6333}
       QDRANT_API_KEY:     ${QDRANT_API_KEY}
@@ -81,6 +83,7 @@ services:
     build:
       context: .
       dockerfile: frontend/Dockerfile
+    image: ghcr.io/placeholder/rag-frontend:latest
     container_name: rag_frontend
 
     ports:

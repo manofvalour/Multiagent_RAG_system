@@ -15,7 +15,7 @@ import json
 from fastapi import FastAPI, HTTPException, Request, Response, Depends, Header, status, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, PlainTextResponse, FileResponse, StreamingResponse
-from multiagent_rag_system.src.observability.observability import setup_observability, setup_otel
+from multiagent_rag_system.src.observability.observability import setup_observability
 
 import structlog
 import os
@@ -57,10 +57,7 @@ async def lifespan(app: FastAPI):
     _start_time = time.perf_counter()
     logger.info("startup", env=settings.environment, version=settings.app_version)
 
-    setup_observability()  # Configures both OpenTelemetry and LangSmith based on settings
-    # Enable console exporter if OTEL_CONSOLE_EXPORT=true (for debugging)
-    use_console = os.getenv("OTEL_CONSOLE_EXPORT", "").lower() == "true"
-    setup_otel(use_console_exporter=use_console)
+    setup_observability()
 
     # Warm up embedder and vector store
     await get_embedder()
@@ -185,6 +182,20 @@ async def query(req: QueryRequest):
         await _cache.lpush_bounded("rag:index", analytics_entry, max_len=1000)
 
         return result
+
+
+@app.post("/query/stream")
+async def query_stream(req: QueryRequest):
+    """Streaming SSE endpoint for the RAG pipeline."""
+    return StreamingResponse(
+        _pipeline.run_streaming(req),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @app.post("/ingest_text", response_model=IngestResponse, status_code=status.HTTP_201_CREATED)

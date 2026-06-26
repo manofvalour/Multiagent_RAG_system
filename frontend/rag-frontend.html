@@ -371,17 +371,22 @@
     color: var(--text-dim); margin-bottom: 12px; font-weight: 500;
   }
   .claim {
-    display: flex; gap: 12px; align-items: flex-start;
     padding: 10px 14px;
     border-radius: 6px;
-    margin-bottom: 6px;
+    margin-bottom: 8px;
     font-size: 13px;
     border: 1px solid transparent;
   }
   .claim.supported { background: rgba(106,154,122,.08); border-color: rgba(106,154,122,.15); }
   .claim.unsupported { background: rgba(154,90,90,.08); border-color: rgba(154,90,90,.15); }
-  .claim-icon { margin-top: 2px; }
+  .claim-row { display: flex; gap: 12px; align-items: flex-start; }
+  .claim-icon { margin-top: 2px; flex-shrink: 0; }
   .claim-text { color: var(--text); line-height: 1.6; }
+  .claim-refs { margin-top: 8px; margin-left: 24px; display: flex; flex-direction: column; gap: 4px; }
+  .claim-ref { font-size: 11px; padding: 4px 8px; border-radius: 4px; background: rgba(255,255,255,.03); border-left: 2px solid var(--border); }
+  .claim-ref-source { color: var(--accent); font-weight: 500; }
+  .claim-ref-score { color: var(--text-dim); }
+  .claim-ref-snippet { color: var(--text-dim); margin-top: 2px; line-height: 1.5; font-size: 11px; }
 
   /* ── Chunks ────────────────────────────────────────── */
   .chunks-section { margin-top: 16px; }
@@ -673,11 +678,15 @@
       </div>
     </div>
 
-    <div style="display:flex; gap:8px; margin-top:4px;">
+    <div style="display:flex; gap:8px; margin-top:4px; align-items:center;">
       <button class="btn btn-primary" id="query-btn" onclick="runQuery()">
         <span>Run Pipeline</span>
       </button>
       <button class="btn btn-ghost" onclick="clearQuery()">Clear</button>
+      <label style="display:flex; align-items:center; gap:4px; margin-left:8px; font-size:13px; cursor:pointer;">
+        <input type="checkbox" id="query-stream" checked />
+        Stream
+      </label>
     </div>
 
     <div class="loading" id="query-loading">
@@ -959,26 +968,91 @@ async function runQuery() {
   hide($('query-result'));
   setLoading('query', true);
 
-  try {
-    const body = {
-      query: q,
-      max_tokens: parseInt($('query-tokens').value) || 1024,
-      top_k: parseInt($('query-topk').value) || 5,
-      min_score: parseFloat($('query-minscore').value) || 0.0,
-    };
+  const body = {
+    query: q,
+    max_tokens: parseInt($('query-tokens').value) || 1024,
+    top_k: parseInt($('query-topk').value) || 5,
+    min_score: parseFloat($('query-minscore').value) || 0.0,
+  };
 
+  if ($('query-stream').checked) {
+    await runQueryStreaming(body);
+  } else {
+    await runQueryBlocking(body);
+  }
+
+  setLoading('query', false);
+  btn.disabled = false;
+}
+
+async function runQueryBlocking(body) {
+  try {
     const d = await apiFetch('/query', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
     renderQueryResult(d);
+  } catch(e) {
+    setError('query', e.message);
+  }
+}
+
+async function runQueryStreaming(body) {
+  try {
+    const resp = await fetch(base() + '/query/stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!resp.ok) {
+      let detail;
+      try { detail = (await resp.json()).detail; } catch { detail = resp.statusText; }
+      throw new Error(detail || `HTTP ${resp.status}`);
+    }
+
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let answerTokens = [];
+    let metaJson = null;
+
+    $('res-answer').textContent = '';
+    show($('query-result'));
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const payload = line.slice(6).trim();
+        if (payload === '[DONE]') continue;
+
+        if (payload.startsWith('{')) {
+          metaJson = payload;
+        } else {
+          answerTokens.push(payload);
+          $('res-answer').textContent = answerTokens.join(' ');
+        }
+      }
+    }
+
+    if (metaJson) {
+      renderQueryResult(JSON.parse(metaJson));
+    } else {
+      $('res-answer').textContent = answerTokens.join(' ');
+      show($('query-result'));
+      $('res-risk').textContent = '—';
+      $('res-latency').textContent = 'streaming';
+    }
 
   } catch(e) {
     setError('query', e.message);
-  } finally {
-    setLoading('query', false);
-    btn.disabled = false;
   }
 }
 
@@ -1004,17 +1078,41 @@ function renderQueryResult(d) {
     $('st-request-id-stat').style.display = 'none';
   }
 
-  // Claims
+  // Claims with data & references
   const cl = $('claims-list');
   cl.innerHTML = '';
   if(d.claims?.length) {
     d.claims.forEach(c => {
+      const claimText = c.claim || c.text || '';
+      const sources = (c.supporting_chunks || []).map(ch => {
+        const chunk = ch.chunk || ch;
+        const src = chunk.source || 'unknown';
+        const score = ch.reranker_score ?? ch.similarity_score ?? ch.score ?? null;
+        const snippet = (chunk.content || chunk.text || '').slice(0, 150);
+        return { source: src, score, snippet };
+      });
+
       const div = document.createElement('div');
       div.className = 'claim ' + (c.supported ? 'supported' : 'unsupported');
-      div.innerHTML = `<span class="claim-icon">${c.supported ? '✓' : '✗'}</span><span class="claim-text">${escHtml(c.claim || c.text || '')}</span>`;
+      let html = `<div class="claim-row"><span class="claim-icon">${c.supported ? '✓' : '✗'}</span>`;
+      html += `<span class="claim-confidence" style="margin-right:8px; font-size:11px; color:var(--text-dim);">${(c.confidence || 0).toFixed(2)}</span>`;
+      html += `<span class="claim-text">${escHtml(claimText)}</span></div>`;
+
+      if (sources.length) {
+        html += `<div class="claim-refs">`;
+        sources.forEach(s => {
+          html += `<div class="claim-ref">`;
+          html += `<span class="claim-ref-source">${escHtml(s.source)}</span>`;
+          if (s.score !== null) html += ` <span class="claim-ref-score">score ${s.score.toFixed(3)}</span>`;
+          if (s.snippet) html += `<div class="claim-ref-snippet">${escHtml(s.snippet)}${s.snippet.length >= 150 ? '…' : ''}</div>`;
+          html += `</div>`;
+        });
+        html += `</div>`;
+      }
+
+      div.innerHTML = html;
       cl.appendChild(div);
     });
-    // Reset and use show() for consistency
     $('claims-section').style.display = '';
     show($('claims-section'), 'block');
   } else {

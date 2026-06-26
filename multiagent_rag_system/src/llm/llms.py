@@ -92,11 +92,7 @@ class AnthropicClient(BaseLLMClient):
             raise MulitagentragException(e,sys)
 
     async def health_check(self) -> bool:
-        try:
-            resp = await self._client.get("https://api.anthropic.com", timeout=5)
-            return resp.status_code < 500
-        except Exception:
-            return False
+        return self._client is not None
 
 
 #GroqAPI
@@ -143,11 +139,7 @@ class GroqClient(BaseLLMClient):
             raise MulitagentragException(e,sys)
 
     async def health_check(self) -> bool:
-        try:
-            resp = await self._client.get("https://api.groq.com", timeout=5)
-            return resp.status_code < 500
-        except Exception:
-            return False
+        return self._client is not None
 
 
 _client_instance: Optional[BaseLLMClient] = None

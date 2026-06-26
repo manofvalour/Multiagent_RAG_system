@@ -20,14 +20,17 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: "3.13"
           cache: "pip"
 
+      - name: Install uv
+        run: pip install uv
+
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: uv sync --frozen --no-dev
 
       - name: Run tests
-        run: pytest tests/ -v --tb=short
+        run: uv run pytest multiagent_rag_system/src/test/ -v --tb=short
         continue-on-error: false
 
   build-and-push:
@@ -56,7 +59,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./Dockerfile
+          file: ./backend/Dockerfile
           push: true
           tags: |
             ${{ env.IMAGE_PREFIX }}/rag-api:latest
@@ -113,6 +116,8 @@ jobs:
             REDIS_URL=${{ secrets.REDIS_URL }}
             GRAFANA_ADMIN_USER=${{ secrets.GRAFANA_ADMIN_USER }}
             GRAFANA_ADMIN_PASSWORD=${{ secrets.GRAFANA_ADMIN_PASSWORD }}
+            OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+            HF_TOKEN=${{ secrets.HF_TOKEN }}
             CORS_ORIGINS=${{ secrets.CORS_ORIGINS }}
             ENVIRONMENT=production
             LANGCHAIN_TRACING_V2=true
@@ -120,7 +125,7 @@ jobs:
             EOF
 
             # Pull new images
-            echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io \
+            echo ${{ secrets.GHCR_PAT }} | docker login ghcr.io \
               -u ${{ github.actor }} --password-stdin
 
             # Update image tags in docker-compose.yml to use the new SHA

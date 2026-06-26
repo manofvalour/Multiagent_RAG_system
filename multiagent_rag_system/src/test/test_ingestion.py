@@ -77,7 +77,7 @@ class TestFileParser:
     @pytest.mark.asyncio
     async def test_parses_plain_text(self):
         parser = FileParser()
-        text, ct = await parser.parse(b"Hello world.", "doc.txt")
+        text, ct = await parser.parse(filename="doc.txt", content=b"Hello world.")
         assert "Hello" in text
         assert ct == ContentType.PROSE
 
@@ -85,14 +85,14 @@ class TestFileParser:
     async def test_parses_markdown(self):
         parser = FileParser()
         md = b"## Heading\n\nParagraph text here."
-        text, ct = await parser.parse(md, "readme.md")
+        text, ct = await parser.parse(filename="readme.md", content=md)
         assert ct == ContentType.MARKDOWN
         assert "Heading" in text
 
     @pytest.mark.asyncio
     async def test_unknown_extension_falls_back_to_text(self):
         parser = FileParser()
-        text, ct = await parser.parse(b"some content", "data.csv")
+        text, ct = await parser.parse(filename="data.csv", content=b"some content")
         assert isinstance(text, str)
 
 
@@ -122,18 +122,27 @@ class TestDocumentIngestionPipeline:
         import numpy as np
         from pathlib import Path
         import tempfile
-        
+        from unittest.mock import patch
+
         mock_embed_model.encode.return_value = np.random.rand(2, 384).astype("float32")
 
         # Create a temporary upload directory
         with tempfile.TemporaryDirectory() as tmpdir:
             pipeline = DocumentIngestionPipeline()
             pipeline.UPLOAD_DIR = tmpdir
-            # Minimal PDF bytes (will fail pypdf gracefully, return empty text)
+
+            # Minimal PDF bytes - mock pypdf and pymupdf to return empty gracefully
             fake_pdf = b"%PDF-1.4 fake content"
-            result = await pipeline.ingest_file(fake_pdf, "report.pdf")
-            assert result.document_id is not None
-            assert result.content_type in ("pdf", "prose")
+            with patch("pypdf.PdfReader") as mock_reader, \
+                 patch("easyocr.Reader") as mock_ocr:
+                # pypdf returns empty pages
+                mock_reader.return_value.pages = []
+                # OCR returns empty result
+                mock_ocr.return_value.readtext.return_value = []
+
+                result = await pipeline.ingest_file(fake_pdf, "report.pdf")
+                assert result.document_id is not None
+                assert result.content_type in ("pdf", "prose")
 
 
 if __name__ == "__main__":
