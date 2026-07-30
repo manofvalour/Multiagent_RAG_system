@@ -15,7 +15,7 @@ server:
 
 reranker:
   enabled: True
-  top_n: 5                      # chunks kept after reranking
+  top_n: 7                      # chunks kept after reranking
   model: "jinaai/jina-reranker-v3"
 
 chunker:
@@ -32,7 +32,7 @@ redis:
   similarity_threshold: 0.92    # reuse cached answer if query is ≥92% similar
 
 llm:
-  active_providers: 'groq'
+  active_provider: 'groq'
   system_prompt: |
     You are a precise, helpful assistant.
     Answer the question using ONLY the provided context.
@@ -41,7 +41,7 @@ llm:
   providers:
     groq: 
       base_url: "https://api.groq.com/openai/v1/chat/completions"
-      model_name: 'openai/gpt-oss-120b'
+      model_name: "qwen/qwen3.6-27b" #'openai/gpt-oss-120b'
       temperature: 0.2
       max_output_tokens: 2048
 
@@ -50,7 +50,14 @@ llm:
       model_name: "claude-sonnet-4-20250514"
       max_output_tokens: 2048
       temperature: 0.0
-      timeout_seconds: 30 
+      timeout_seconds: 30
+
+    gemini:
+      base_url: "https://generativelanguage.googleapis.com/v1/models"
+      model_name: "gemini-3.5-flash-lite"
+      temperature: 0.0
+      max_output_tokens: 4096
+      timeout_seconds: 60
 
 embedding:
   embedding_model: "sentence-transformers/all-MiniLM-L6-v2"
@@ -61,9 +68,9 @@ embedding:
 vector_store:
   vector_store_type: 'qdrant'
   qdrant_index_path: "./data/qdrant"
-  top_k_retrieval: 10
+  top_k_retrieval: 15
   qdrant_url: "http://localhost:6333"
-  collection_name: "rag_chunk"
+  collection_name: "multi_agent_rag_system"
   hnsw_m: 16                  
   hnsw_ef_construct: 128        
   hnsw_ef: 128            
@@ -85,22 +92,3 @@ observability:
   enable_tracing: true
   otlp_endpoint: "http://localhost:4317"
   sentry_dsn: ""
-
-paper_reader:
-  max_results: 10
-  analysis_model: "openai/gpt-oss-120b"
-  include_code: true
-  include_math: true
-
-research_sources:
-  arxiv:
-    enabled: true
-    categories: ["cs.AI", "cs.LG", "cs.CL", "cs.CV"]
-  pubmed:
-    enabled: true
-    api_key: ""
-  paperswithcode:
-    enabled: true
-  huggingface:
-    enabled: true
-    datasets_only: false

@@ -23,7 +23,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 import os
 
 
-_BASE_DIR  = Path(__file__).resolve().parent.parent.parent
+_BASE_DIR  = Path(__file__).resolve().parent.parent
 _YAML_PATH = _BASE_DIR / "config" / "configuration.yaml"
 
 
@@ -49,8 +49,9 @@ def _load_yaml(path: Path = _YAML_PATH) -> dict[str, Any]:
     for section, values in config.items():
         if isinstance(values, dict):
             if section == "llm":
-                flat["active_provider"] = values.get("active_provider", "groq")
-                flat["llm_providers"]   = values.get("providers", {})
+                if "ACTIVE_PROVIDER" not in os.environ:
+                    flat["active_provider"] = values.get("active_provider", "groq")
+                flat["llm_providers"] = values.get("providers", {})
             else:
                 flat.update(values)
         else:
@@ -71,12 +72,14 @@ class LLMProvider(str, Enum):
     ANTHROPIC = "anthropic"
     GROQ      = "groq"
     OPENAI    = "openai"
+    GEMINI    = "gemini"
 
 
 class ExpansionStrategy(str, Enum):
     HYDE        = "hyde"
     MULTI_QUERY = "multi_query"
     BOTH        = "both"
+    OFF         = 'off'
 
 
 # ── Sub-configs (one class per logical concern)
@@ -84,7 +87,7 @@ class ExpansionStrategy(str, Enum):
 class LLMProviderConfig(BaseModel):
     """Config for a single LLM provider entry inside llm_providers."""
     base_url:          str   = "https://api.groq.com/openai/v1/chat/completions"
-    model_name:        str   = "openai/gpt-oss-120b"
+    model_name:        str   = "qwen/qwen3.6-27b" #"openai/gpt-oss-120b"
     temperature:       float = Field(default=0.0,  ge=0.0, le=2.0)
     max_output_tokens: int   = Field(default=2048, ge=1)
     timeout_seconds:   int   = Field(default=30,   ge=1)
@@ -224,7 +227,7 @@ class ObservabilityConfig(BaseModel):
 
 class EvaluationConfig(BaseModel):
     """RAGAS quality evaluation — async, sampled."""
-    enabled: bool = True
+    enabled: bool = False
     sample_rate: float = 0.1    # fraction of live queries to evaluate
 
 
@@ -281,17 +284,20 @@ class Settings(BaseSettings):
     openai_api_key: SecretStr = Field(default="", alias="OPENAI_API_KEY")
     anthropic_api_key: SecretStr = Field(default="", alias="ANTHROPIC_API_KEY")
     groq_api_key: SecretStr = Field(default="", alias="GROQ_API_KEY")
+    gemini_api_key: SecretStr = Field(default="", alias="GEMINI_API_KEY")
     qdrant_api_key: SecretStr = Field(default="", alias="QDRANT_API_KEY")
     langsmith_api_key: SecretStr = Field(default="", alias="LANGSMITH_API_KEY")
     qdrant_endpoint: SecretStr = Field(default="", alias = "QDRANT_ENDPOINT")
     redis_url: str = Field(default="redis://localhost:6379/0", alias="REDIS_URL")
+    ragas_groq_api_key: SecretStr = Field(default="", alias="RAGAS_GROQ_API")
+    ragas_gemini_api_key: SecretStr = Field(default="", alias= "RAGAS_GEMINI_API")
     #jwt_secret:SecretStr = Field(default="", alias="JWT_SECRET")
 
     # ── LLM provider registry ──────────────────────────────────────────────
-    active_provider: LLMProvider = LLMProvider.GROQ
+    active_provider: LLMProvider = LLMProvider.GEMINI
     llm_providers: dict[str, LLMProviderConfig] = {
         "groq": LLMProviderConfig(
-            model_name="openai/gpt-oss-120b",
+            model_name="openai/gpt-oss-120b", #"qwen/qwen3.6-27b", #
             base_url="https://api.groq.com/openai/v1/chat/completions",
         ),
         "anthropic": LLMProviderConfig(
@@ -301,6 +307,13 @@ class Settings(BaseSettings):
         "openai": LLMProviderConfig(
             model_name="gpt-4o-mini",
             base_url="https://api.openai.com/v1/chat/completions",
+        ),
+        "gemini": LLMProviderConfig(
+            model_name="gemini-3.5-flash-lite",
+            base_url="https://generativelanguage.googleapis.com/v1/models",
+            temperature=0.0,
+            max_output_tokens=4096,
+            timeout_seconds=60,
         ),
     }
 
@@ -335,6 +348,7 @@ class Settings(BaseSettings):
             LLMProvider.GROQ:      self.groq_api_key,
             LLMProvider.ANTHROPIC: self.anthropic_api_key,
             LLMProvider.OPENAI:    self.openai_api_key,
+            LLMProvider.GEMINI:    self.gemini_api_key,
         }
         secret = mapping[self.active_provider]
         return secret.get_secret_value() if secret else ""

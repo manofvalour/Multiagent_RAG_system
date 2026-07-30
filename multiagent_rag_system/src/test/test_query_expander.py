@@ -1,6 +1,6 @@
 """
 tests/test_agents.py
-Unit tests for the QueryExpansionAgent    — HyDE + multi-query via Groq
+Unit tests for the QueryExpansionAgent    — HyDE + multi-query
 """
 from __future__ import annotations
 
@@ -10,6 +10,8 @@ import pytest
 from ..models.models import (ContentType, DocumentChunk, 
                                   QueryRequest, QueryResponse,
                                  Claim, RerankedChunk, RetrievedChunk)
+from ..llm.llms import LLMResponse
+
 
 def _make_doc(i: int, content: str = None) -> DocumentChunk:
     return DocumentChunk(
@@ -49,7 +51,7 @@ def sample_claims(docs) -> list[Claim]:
 def mock_llm():
     llm = MagicMock()
     llm.complete = AsyncMock(
-        return_value=QueryResponse(answer="RAG reduces hallucinations by grounding answers.")
+        return_value=LLMResponse(text="RAG reduces hallucinations by grounding answers.")
     )
     return llm
 
@@ -71,8 +73,7 @@ class TestQueryExpansionAgent:
         from multiagent_rag_system.agent.agents.query_expansion import QueryExpansionAgent
 
         agent = QueryExpansionAgent.__new__(QueryExpansionAgent)
-        agent.api_key  = "test-key"
-        agent._groqai  = None
+        agent._llm = None
 
         config_mock = MagicMock()
         config_mock.enabled = enabled
@@ -88,10 +89,8 @@ class TestQueryExpansionAgent:
 
         return agent
 
-    def _mock_groq_response(self, text: str):
-        resp = MagicMock()
-        resp.choices[0].message.content = text
-        return resp
+    def _mock_llm_response(self, text: str):
+        return LLMResponse(text=text)
 
     @pytest.mark.asyncio
     async def test_disabled_returns_only_original(self):
@@ -104,11 +103,11 @@ class TestQueryExpansionAgent:
     @pytest.mark.asyncio
     async def test_hyde_strategy(self):
         agent = self._make_agent(strategy="hyde")
-        mock_client = MagicMock()
-        mock_client.chat.completions.create = AsyncMock(
-            return_value=self._mock_groq_response("RAG retrieves documents and uses them.")
+        mock_llm = MagicMock()
+        mock_llm.complete = AsyncMock(
+            return_value=self._mock_llm_response("RAG retrieves documents and uses them.")
         )
-        agent._groqai = mock_client
+        agent._llm = mock_llm
 
         q = QueryRequest(query="What is RAG?")
         queries, hyde = await agent.expand(q)
@@ -121,13 +120,13 @@ class TestQueryExpansionAgent:
     @pytest.mark.asyncio
     async def test_multi_query_strategy(self):
         agent = self._make_agent(strategy="multi_query")
-        mock_client = MagicMock()
-        mock_client.chat.completions.create = AsyncMock(
-            return_value=self._mock_groq_response(
+        mock_llm = MagicMock()
+        mock_llm.complete = AsyncMock(
+            return_value=self._mock_llm_response(
                 "How does RAG work?\nExplain retrieval augmented generation\nWhat makes RAG useful?"
             )
         )
-        agent._groqai = mock_client
+        agent._llm = mock_llm
 
         q = QueryRequest(query="What is RAG?")
         queries, hyde = await agent.expand(q)
@@ -139,12 +138,12 @@ class TestQueryExpansionAgent:
     @pytest.mark.asyncio
     async def test_both_strategy_combines_results(self):
         agent = self._make_agent(strategy="both")
-        mock_client = MagicMock()
-        mock_client.chat.completions.create = AsyncMock(side_effect=[
-            self._mock_groq_response("RAG retrieves and generates."),  # HyDE call
-            self._mock_groq_response("How does RAG work?\nExplain RAG\nWhat is RAG used for?"),
+        mock_llm = MagicMock()
+        mock_llm.complete = AsyncMock(side_effect=[
+            self._mock_llm_response("RAG retrieves and generates."),  # HyDE call
+            self._mock_llm_response("How does RAG work?\nExplain RAG\nWhat is RAG used for?"),
         ])
-        agent._groqai = mock_client
+        agent._llm = mock_llm
 
         q = QueryRequest(query="What is RAG?")
         queries, hyde = await agent.expand(q)
@@ -158,15 +157,15 @@ class TestQueryExpansionAgent:
     async def test_original_always_first(self):
         for strategy in ("hyde", "multi_query", "both"):
             agent = self._make_agent(strategy=strategy)
-            mock_client = MagicMock()
-            mock_client.chat.completions.create = AsyncMock(
-                return_value=self._mock_groq_response("some content\nmore content\neven more")
+            mock_llm = MagicMock()
+            mock_llm.complete = AsyncMock(
+                return_value=self._mock_llm_response("some content\nmore content\neven more")
             )
-            agent._groqai = mock_client
+            agent._llm = mock_llm
             q = QueryRequest(query="test query")
             queries, _ = await agent.expand(q)
             assert queries[0] == "test query", f"Failed for strategy={strategy}"
- 
+
 if __name__=="__main__":
     import pytest
     pytest.main([__file__, "-v", "--asyncio-mode=auto"])

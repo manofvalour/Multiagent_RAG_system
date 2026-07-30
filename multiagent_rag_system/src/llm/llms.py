@@ -8,9 +8,10 @@ import asyncio
 import time
 from abc import ABC, abstractmethod
 from typing import AsyncIterator, Optional
+from functools import lru_cache
 
 import httpx
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type, retry_if_exception
 import sys
 
 from ..utils.config_loader import get_settings
@@ -142,19 +143,76 @@ class GroqClient(BaseLLMClient):
         return self._client is not None
 
 
-_client_instance: Optional[BaseLLMClient] = None
+class GeminiClient(BaseLLMClient):
+    def __init__(self):
+        key = settings.gemini_api_key.get_secret_value()
+        self.llm_config = settings.llm_providers['gemini']
+        self._headers = {
+            "x-goog-api-key": key,
+            "Content-Type": "application/json",
+        }
+        self._client = httpx.AsyncClient(timeout=self.llm_config.timeout_seconds)
+
+    def _build_url(self) -> str:
+        return f"{self.llm_config.base_url}/{self.llm_config.model_name}:generateContent"
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=1, max=10),
+        retry=retry_if_exception_type((httpx.ConnectError, httpx.TimeoutException)),
+        reraise=True,
+    )
+    async def complete(self, system: str, user: str,
+                       temperature: Optional[float] = None) -> LLMResponse:
+        try:
+            t0 = time.perf_counter()
+            payload = {
+                "system_instruction": {"parts": [{"text": system}]},
+                "contents": [{"role": "user", "parts": [{"text": user}]}],
+                "generationConfig": {
+                    "temperature": temperature if temperature is not None else self.llm_config.temperature,
+                    "maxOutputTokens": self.llm_config.max_output_tokens,
+                },
+            }
+
+            resp = await self._client.post(self._build_url(), headers=self._headers, json=payload)
+            resp.raise_for_status()
+            data = resp.json()
+            text = data["candidates"][0]["content"]["parts"][0]["text"]
+            usage = data.get("usageMetadata", {})
+
+            response = LLMResponse(
+                text=text,
+                input_tokens=usage.get("promptTokenCount", 0),
+                output_tokens=usage.get("candidatesTokenCount", 0),
+                latency_ms=(time.perf_counter() - t0) * 1000,
+            )
+            logger.info("LLM generation completed")
+            return response
+
+        except Exception as e:
+            logger.error("Gemini request failed", error=str(e))
+            raise MulitagentragException(e, sys)
+
+    async def health_check(self) -> bool:
+        return self._client is not None
 
 
-def get_llm_client() -> BaseLLMClient:
-    global _client_instance
-    if _client_instance is not None:
-        return _client_instance
 
-    provider = settings.active_provider
+#_client_instance: Optional[BaseLLMClient] = None
+
+@lru_cache(maxsize=1)
+def get_llm_client(provider = settings.active_provider) -> BaseLLMClient:
+  #  global _client_instance
+   # if _client_instance is not None:
+    #    return _client_instance
+
     if provider == "anthropic" and settings.anthropic_api_key.get_secret_value():
         _client_instance = AnthropicClient()
     elif provider == "groq" and settings.groq_api_key.get_secret_value():
         _client_instance = GroqClient()
-    
+    elif provider == "gemini" and settings.gemini_api_key.get_secret_value():
+        _client_instance = GeminiClient()
+
     logger.info("llm_client_created", provider=type(_client_instance).__name__)
     return _client_instance

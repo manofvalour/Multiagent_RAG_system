@@ -48,3 +48,8 @@ huggingface_hub==0.24.0
 apscheduler==3.10.4
 redis[hiredis]
 crawl4ai
+matplotlib
+langchain_google_genai
+langchain_groq
+sentence_transformers
+google_genai

@@ -9,31 +9,27 @@ from __future__ import annotations
 
 import asyncio
 from typing import Optional
-from groq import AsyncGroq
-import httpx
 from langsmith import traceable
 
 from multiagent_rag_system.src.utils.config_loader import get_settings
 from multiagent_rag_system.src.logger import GLOBAL_LOGGER as logger
 from multiagent_rag_system.src.exception.custom_exception import MulitagentragException
 from multiagent_rag_system.src.models.models import QueryRequest
+from multiagent_rag_system.src.llm.llms import BaseLLMClient, get_llm_client
+
 settings = get_settings()
 
 class QueryExpansionAgent:
     def __init__(
         self) -> None:
-
-        self._groqai: Optional[AsyncGroq] = None
-        self.api_key = settings.groq_api_key.get_secret_value()
+        self._llm: Optional[BaseLLMClient] = None
         self.config = settings.query_expansion
         self.model_config = settings.llm_providers[settings.active_provider]
 
-    def _client(self) -> AsyncGroq:
-        if self._groqai is None:
-            # Configure timeout using httpx.Timeout
-            timeout = httpx.Timeout(self.config.timeout_seconds)
-            self._groqai = AsyncGroq(api_key=self.api_key, timeout=timeout)
-        return self._groqai
+    def _client(self) -> BaseLLMClient:
+        if self._llm is None:
+            self._llm = get_llm_client()
+        return self._llm
 
     @traceable(name="Query Expansion Agent")
     async def expand(self, query: QueryRequest) -> tuple[list[str], Optional[str]]:
@@ -88,13 +84,12 @@ class QueryExpansionAgent:
             f"Question: {query}\n\n"
             f"Paragraph (3-5 sentences, use domain-specific terminology):"
         )
-        resp = await self._client().chat.completions.create(
-            model=self.model_config.model_name,
-            messages=[{"role": "user", "content": prompt}],
-            temperature = self.config.hyde_temperature,
-            max_tokens=256,
+        resp = await self._client().complete(
+            system="You are a precise, factual assistant.",
+            user=prompt,
+            temperature=self.config.hyde_temperature,
         )
-        result = resp.choices[0].message.content.strip()
+        result = resp.text.strip()
         logger.debug(f"HyDE doc: {result[:80]}…")
         return result
 
@@ -106,11 +101,10 @@ class QueryExpansionAgent:
             f"Output one rephrasing per line, no numbering or bullets.\n\n"
             f"Original: {query}\n\nRephrasings:"
         )
-        resp = await self._client().chat.completions.create(
-            model=self.model_config.model_name,
-            messages=[{"role": "user", "content": prompt}],
+        resp = await self._client().complete(
+            system="You are a helpful assistant.",
+            user=prompt,
             temperature=0.8,
-            max_tokens=256,
         )
-        lines = resp.choices[0].message.content.strip().splitlines()
+        lines = resp.text.strip().splitlines()
         return [l.strip() for l in lines if l.strip()][: self.config.num_queries]

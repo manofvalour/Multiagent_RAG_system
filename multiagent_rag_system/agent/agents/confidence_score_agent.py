@@ -1,5 +1,6 @@
 from __future__ import annotations
 import asyncio
+import math
 import re
 import time
 from typing import Optional
@@ -39,8 +40,8 @@ class ConfidenceScoringAgent:
                 sum(1 for c in claims if c.supported)/max(len(claims), 1)
             )
             avg_relevance = (
-                sum(rc.reranker_score for rc in chunks)/ max(len(chunks),1)
-            )
+                sum(1.0 / (1.0 + math.exp(-rc.reranker_score)) for rc in chunks) / max(len(chunks), 1)
+            ) ## clamping the reranker score at 0.1 when it's less than 0
 
             src_text = " ".join(rc.chunk.content for rc in chunks)
             source_overlap = _overlap_ratio(answer, src_text)
