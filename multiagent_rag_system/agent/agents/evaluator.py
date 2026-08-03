@@ -14,13 +14,13 @@ from multiagent_rag_system.src.utils.config_loader import get_settings
 from multiagent_rag_system.src.models.models import RAGASScores, RerankedChunk
 from multiagent_rag_system.src.logger import GLOBAL_LOGGER as logger
 
-from ragas.metrics.collections import Faithfulness, AnswerRelevancy, ContextPrecision, ContextRecall
+from ragas.metrics import Faithfulness, AnswerRelevancy, ContextPrecision, ContextRecall
 
 from groq import Groq
 from ragas.llms import llm_factory
 from google import genai
 from openai import OpenAI, AsyncOpenAI
-from ragas.embeddings import HuggingFaceEmbeddings
+from ragas.embeddings import HuggingfaceEmbeddings
 
 
 settings = get_settings()
@@ -40,15 +40,15 @@ class RAGASEvaluator:
             model = 'openai/gpt-oss-120b'
         elif provider == 'gemini':
             client = AsyncOpenAI(
-                api_key=settings.ragas_gemini_api_key.get_secret_value(),
+                api_key=  settings.ragas_gemini_api_key.get_secret_value(),
                 base_url="https://generativelanguage.googleapis.com/v1beta/openai/")
             model = 'gemini-3.5-flash-lite'
 
         self.llm = llm_factory(model=model,
-                        client=client)
+                        run_config=client)
 
         EMBEDDING_MODEL_NAME = 'sentence-transformers/all-MiniLM-L6-v2'
-        self.embeddings = HuggingFaceEmbeddings(model=EMBEDDING_MODEL_NAME)
+        self.embeddings = HuggingfaceEmbeddings(model=EMBEDDING_MODEL_NAME)
 
     async def evaluate(self, query:str,
         answer:str, chunks:list[RerankedChunk],
@@ -64,7 +64,7 @@ class RAGASEvaluator:
         try:
             scores = await asyncio.wait_for(
                 self._run(query, answer, chunks, 
-                ), )
+                ), timeout=120000)
         
         except asyncio.TimeoutError:
             logger.warning("RAGAS evaluation timed out after 60s")
