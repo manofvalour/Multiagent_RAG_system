@@ -897,10 +897,7 @@
 
 const $ = id => document.getElementById(id);
 const API_BASE = (() => {
-  // Try to get from environment, fallback to relative path
   if (window.ENV?.API_URL) return window.ENV.API_URL;
-  // In production with nginx reverse proxy, API is at /api
-  // Otherwise, assume same host:port as current page
   return '/api'.replace(/\/$/, '');
 })();
 const base = () => API_BASE;
