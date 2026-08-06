@@ -279,8 +279,6 @@ The benchmark workflow is split into two notebooks under `notebook/`:
 ### Report & docs (`docs/`)
 
 - `report.md` — experiment design / results / analysis / conclusion.
-- `plan.md` — analysis plan.
-- `analysis_viz.md` — rationale for each visualization.
 
 **Current best config: F (Reranker=ON, 1 gen, hyde). Fastest: D (ON, 3 gen, off).**
 
