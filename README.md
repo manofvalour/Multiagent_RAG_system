@@ -249,9 +249,44 @@ multiagent_rag_system/
 │   └── grafana/              # Grafana dashboards and provisioning
 ├── config/
 │   └── configuration.yaml    # Application configuration
+├── notebook/
+│   ├── experimentation.ipynb # Benchmark sweep (16 configs × 27 queries)
+│   ├── analysis.ipynb        # Standalone post-hoc analysis (Groups 1–7)
+│   ├── result/               # Raw JSON + summary CSV exports
+├── docs/                     # report.md, plan.md, analysis_viz.md
 ├── docker-compose.yml        # Production stack
 └── requirements.txt          # Python dependencies
 ```
+
+## Benchmarking & Analysis
+
+The pipeline is evaluated with a **2×2×4 factorial sweep** over 16 pipeline
+configurations (**A–P**): reranker ON/OFF × consensus generators 1/3 × query
+expansion `both`/`hyde`/`multi_query`/`off`, run against 27 fixed eval queries.
+
+The benchmark workflow is split into two notebooks under `notebook/`:
+
+| Notebook | Purpose |
+|----------|---------|
+| `notebook/experimentation.ipynb` | Initializes components, ingests docs, runs all 16 configs against the 27 queries, computes RAGAS + LLM-judge grounding, and exports raw results to `notebook/result/benchmark_raw.json` (expensive: calls external LLM APIs). |
+| `notebook/analysis.ipynb` | **Standalone** — reloads `notebook/result/benchmark_raw.json`, builds summary tables, and runs the post-hoc Groups 1–7 analysis (grounding audit, latency characterization, quality/safety profile, main effects, balanced composite + Pareto, final recommendation). Also exports `notebook/result/benchmark_summary.csv`. |
+
+> Run **Run All** on `experimentation.ipynb` first, then `analysis.ipynb` (which
+> needs no re-run of the experiments). Analysis cells are robust to missing/NaN
+> grounding scores.
+
+### Report & docs (`docs/`)
+
+- `report.md` — experiment design / results / analysis / conclusion.
+- `plan.md` — analysis plan.
+- `analysis_viz.md` — rationale for each visualization.
+
+**Current best config: F (Reranker=ON, 1 gen, hyde). Fastest: D (ON, 3 gen, off).**
+
+> ⚠ The `grounding_score` LLM-judge is **not discriminative** (73% of grades landed on
+> 1.0, ρ≈0.09 vs faithfulness) — use it only as a flag, never for ranking. Cross-check
+> hallucination-risk labels against RAGAS scores before trusting them.
+> Latency includes external LLM API time + judge sleeps; compare with median/p95, not the mean.
 
 ## Testing
 
