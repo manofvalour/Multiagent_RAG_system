@@ -264,6 +264,7 @@ The pipeline is evaluated with a **2×2×4 factorial sweep** over 16 pipeline
 configurations (**A–P**): reranker ON/OFF × consensus generators 1/3 × query
 expansion `both`/`hyde`/`multi_query`/`off`, run against 27 fixed eval queries.
 
+
 The benchmark workflow is split into two notebooks under `notebook/`:
 
 | Notebook | Purpose |

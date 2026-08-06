@@ -60,7 +60,6 @@ class RAGASEvaluator:
 
       #  if not self.cfg.enabled or random.random() > self.cfg.sample_rate:
        #     return None
-
         try:
             scores = await asyncio.wait_for(
                 self._run(query, answer, chunks, 

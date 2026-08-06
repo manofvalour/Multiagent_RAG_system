@@ -10,7 +10,6 @@ This report is produced from the appended post-hoc analysis in
 `analysis_viz.md` (rationale for each visualization).
 
 ---
-
 ## 1. Experiment design
 
 ### 1.1 System under test
