@@ -14,13 +14,15 @@ from multiagent_rag_system.src.utils.config_loader import get_settings
 from multiagent_rag_system.src.models.models import RAGASScores, RerankedChunk
 from multiagent_rag_system.src.logger import GLOBAL_LOGGER as logger
 
-from ragas.metrics import Faithfulness, AnswerRelevancy, ContextPrecision, ContextRecall
+from ragas.metrics.collections import Faithfulness, AnswerRelevancy, ContextPrecision, ContextRecall
 
 from groq import Groq
 from ragas.llms import llm_factory
 from google import genai
 from openai import OpenAI, AsyncOpenAI
-from ragas.embeddings import HuggingfaceEmbeddings
+from ragas.embeddings import HuggingFaceEmbeddings
+#from langchain_huggingface import HuggingFaceEmbeddings
+#from ragas.embeddings import LangchainEmbeddingsWrapper
 
 
 settings = get_settings()
@@ -45,10 +47,13 @@ class RAGASEvaluator:
             model = 'gemini-3.5-flash-lite'
 
         self.llm = llm_factory(model=model,
-                        run_config=client)
+                        client=client)
 
         EMBEDDING_MODEL_NAME = 'sentence-transformers/all-MiniLM-L6-v2'
-        self.embeddings = HuggingfaceEmbeddings(model=EMBEDDING_MODEL_NAME)
+        #hf_embeddings = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL_NAME)
+        #self.embeddings = LangchainEmbeddingsWrapper(hf_embeddings)
+
+        self.embeddings = HuggingFaceEmbeddings(model=EMBEDDING_MODEL_NAME)
 
     async def evaluate(self, query:str,
         answer:str, chunks:list[RerankedChunk],
