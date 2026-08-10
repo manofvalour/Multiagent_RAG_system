@@ -5504,10 +5504,10 @@
         "hallucination_risk": "MEDIUM",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.9556,
+        "context_precision": 0.7,
+        "context_recall": 1.0
       },
       {
         "query": "Why is RAG widely used in enterprise applications?",
@@ -5526,10 +5526,10 @@
         "hallucination_risk": "HIGH",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.0,
+        "context_precision": 0.0,
+        "context_recall": 0.0
       },
       {
         "query": "What technique does RAG use to retrieve relevant information?",
@@ -5548,10 +5548,10 @@
         "hallucination_risk": "LOW",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.6857,
+        "context_precision": 0.5769,
+        "context_recall": 1.0
       },
       {
         "query": "What is a vector database used for?",
@@ -5570,10 +5570,10 @@
         "hallucination_risk": "LOW",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.7535,
+        "context_precision": 1.0,
+        "context_recall": 1.0
       },
       {
         "query": "How does Qdrant perform fast similarity search?",
@@ -5592,10 +5592,10 @@
         "hallucination_risk": "MEDIUM",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.8829,
+        "context_precision": 1.0,
+        "context_recall": 1.0
       },
       {
         "query": "What are some popular vector databases besides Qdrant?",
@@ -5614,10 +5614,10 @@
         "hallucination_risk": "MEDIUM",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.8881,
+        "context_precision": 1.0,
+        "context_recall": 1.0
       },
       {
         "query": "What distance metrics are commonly used in vector databases?",
@@ -5636,10 +5636,10 @@
         "hallucination_risk": "LOW",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.9774,
+        "context_precision": 1.0,
+        "context_recall": 1.0
       },
       {
         "query": "What indexing algorithm does Qdrant use?",
@@ -5658,10 +5658,10 @@
         "hallucination_risk": "MEDIUM",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.8141,
+        "context_precision": 1.0,
+        "context_recall": 1.0
       },
       {
         "query": "What is RAGAS and what does it measure?",
@@ -5680,10 +5680,10 @@
         "hallucination_risk": "MEDIUM",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.9075,
+        "context_precision": 1.0,
+        "context_recall": 1.0
       },
       {
         "query": "How does faithfulness differ from answer relevancy?",
@@ -5702,10 +5702,10 @@
         "hallucination_risk": "LOW",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.9645,
+        "context_precision": 1.0,
+        "context_recall": 1.0
       },
       {
         "query": "What is a typical good faithfulness score for a RAG pipeline?",
@@ -5724,10 +5724,10 @@
         "hallucination_risk": "LOW",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.9502,
+        "context_precision": 1.0,
+        "context_recall": 1.0
       },
       {
         "query": "How is hallucination risk typically assessed?",
@@ -5746,10 +5746,10 @@
         "hallucination_risk": "LOW",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.9987,
+        "context_precision": 0.6429,
+        "context_recall": 1.0
       },
       {
         "query": "What does context precision evaluate?",
@@ -5768,10 +5768,10 @@
         "hallucination_risk": "MEDIUM",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 1.0,
+        "context_precision": 0.5,
+        "context_recall": 1.0
       },
       {
         "query": "What is cross-encoder reranking?",
@@ -5790,10 +5790,10 @@
         "hallucination_risk": "MEDIUM",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.9384,
+        "context_precision": 1.0,
+        "context_recall": 1.0
       },
       {
         "query": "How does two-stage retrieval work?",
@@ -5812,10 +5812,10 @@
         "hallucination_risk": "MEDIUM",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 1.0,
+        "context_precision": 1.0,
+        "context_recall": 1.0
       },
       {
         "query": "Why are cross-encoders more accurate than bi-encoders?",
@@ -5834,10 +5834,10 @@
         "hallucination_risk": "MEDIUM",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 1.0,
+        "context_precision": 1.0,
+        "context_recall": 1.0
       },
       {
         "query": "What cross-encoder models are mentioned?",
@@ -5856,10 +5856,10 @@
         "hallucination_risk": "MEDIUM",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 1.0,
+        "context_precision": 1.0,
+        "context_recall": 1.0
       },
       {
         "query": "How does two-stage retrieval balance latency and accuracy?",
@@ -5878,10 +5878,10 @@
         "hallucination_risk": "MEDIUM",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 1.0,
+        "context_precision": 1.0,
+        "context_recall": 1.0
       },
       {
         "query": "What is multi-agent consensus in RAG?",
@@ -5900,10 +5900,10 @@
         "hallucination_risk": "MEDIUM",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.7199,
+        "context_precision": 1.0,
+        "context_recall": 1.0
       },
       {
         "query": "How does multi-agent consensus improve answer reliability?",
@@ -5922,10 +5922,10 @@
         "hallucination_risk": "MEDIUM",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 1.0,
+        "context_precision": 1.0,
+        "context_recall": 1.0
       },
       {
         "query": "How many LLM instances are typically used in consensus?",
@@ -5944,10 +5944,10 @@
         "hallucination_risk": "LOW",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.8807,
+        "context_precision": 1.0,
+        "context_recall": 1.0
       },
       {
         "query": "How is the best answer selected from multiple candidates?",
@@ -5966,10 +5966,10 @@
         "hallucination_risk": "MEDIUM",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 1.0,
+        "context_precision": 1.0,
+        "context_recall": 1.0
       },
       {
         "query": "What additional verification step strengthens trust after consensus?",
@@ -5988,10 +5988,10 @@
         "hallucination_risk": "LOW",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.6928,
+        "context_precision": 0.9167,
+        "context_recall": 1.0
       },
       {
         "query": "Explain the full RAG retrieval-to-answer pipeline including reranking and consensus.",
@@ -6010,10 +6010,10 @@
         "hallucination_risk": "MEDIUM",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.5421,
+        "context_precision": 0.5,
+        "context_recall": 1.0
       },
       {
         "query": "How does INT4 quantization like GPTQ preserve accuracy compared to naive quantization?",
@@ -6032,10 +6032,10 @@
         "hallucination_risk": "MEDIUM",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.7585,
+        "context_precision": 1.0,
+        "context_recall": 1.0
       }
     ]
   },
@@ -6064,10 +6064,10 @@
         "hallucination_risk": "MEDIUM",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.859,
+        "context_precision": 1.0,
+        "context_recall": 1.0
       },
       {
         "query": "How does RAG reduce hallucinations in LLM outputs?",
@@ -6086,10 +6086,10 @@
         "hallucination_risk": "MEDIUM",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.8528,
+        "context_precision": 0.6667,
+        "context_recall": 1.0
       },
       {
         "query": "What are the main components of a modern RAG pipeline?",
@@ -6108,10 +6108,10 @@
         "hallucination_risk": "HIGH",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.9466,
+        "context_precision": 0.6429,
+        "context_recall": 1.0
       },
       {
         "query": "Why is RAG widely used in enterprise applications?",
@@ -6130,10 +6130,10 @@
         "hallucination_risk": "LOW",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.648,
+        "context_precision": 1.0,
+        "context_recall": 1.0
       },
       {
         "query": "What technique does RAG use to retrieve relevant information?",
@@ -6152,10 +6152,10 @@
         "hallucination_risk": "LOW",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.6933,
+        "context_precision": 0.625,
+        "context_recall": 1.0
       },
       {
         "query": "What is a vector database used for?",
@@ -6174,10 +6174,10 @@
         "hallucination_risk": "LOW",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.8506,
+        "context_precision": 0.5,
+        "context_recall": 1.0
       },
       {
         "query": "How does Qdrant perform fast similarity search?",
@@ -6196,10 +6196,10 @@
         "hallucination_risk": "LOW",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.9026,
+        "context_precision": 1.0,
+        "context_recall": 1.0
       },
       {
         "query": "What are some popular vector databases besides Qdrant?",
@@ -6218,10 +6218,10 @@
         "hallucination_risk": "MEDIUM",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 1.0,
+        "context_precision": 1.0,
+        "context_recall": 1.0
       },
       {
         "query": "What distance metrics are commonly used in vector databases?",
@@ -6240,10 +6240,10 @@
         "hallucination_risk": "LOW",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.9774,
+        "context_precision": 1.0,
+        "context_recall": 1.0
       },
       {
         "query": "What indexing algorithm does Qdrant use?",
@@ -6262,10 +6262,10 @@
         "hallucination_risk": "MEDIUM",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.8209,
+        "context_precision": 1.0,
+        "context_recall": 1.0
       },
       {
         "query": "What is RAGAS and what does it measure?",
@@ -6284,10 +6284,10 @@
         "hallucination_risk": "MEDIUM",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.9075,
+        "context_precision": 1.0,
+        "context_recall": 1.0
       },
       {
         "query": "How does faithfulness differ from answer relevancy?",
@@ -6306,10 +6306,10 @@
         "hallucination_risk": "MEDIUM",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.8327,
+        "context_precision": 1.0,
+        "context_recall": 1.0
       },
       {
         "query": "What is a typical good faithfulness score for a RAG pipeline?",
@@ -6328,10 +6328,10 @@
         "hallucination_risk": "LOW",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.9731,
+        "context_precision": 1.0,
+        "context_recall": 1.0
       },
       {
         "query": "How is hallucination risk typically assessed?",
@@ -6350,10 +6350,10 @@
         "hallucination_risk": "LOW",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.9537,
+        "context_precision": 0.8333,
+        "context_recall": 1.0
       },
       {
         "query": "What does context precision evaluate?",
@@ -6372,10 +6372,10 @@
         "hallucination_risk": "MEDIUM",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 1.0,
+        "context_precision": 0.5,
+        "context_recall": 1.0
       },
       {
         "query": "What is cross-encoder reranking?",
@@ -6394,10 +6394,10 @@
         "hallucination_risk": "MEDIUM",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.9316,
+        "context_precision": 1.0,
+        "context_recall": 1.0
       },
       {
         "query": "How does two-stage retrieval work?",
@@ -6416,10 +6416,10 @@
         "hallucination_risk": "MEDIUM",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.9928,
+        "context_precision": 1.0,
+        "context_recall": 1.0
       },
       {
         "query": "Why are cross-encoders more accurate than bi-encoders?",
@@ -6438,10 +6438,10 @@
         "hallucination_risk": "LOW",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 1.0,
+        "context_precision": 1.0,
+        "context_recall": 1.0
       },
       {
         "query": "What cross-encoder models are mentioned?",
@@ -6460,10 +6460,10 @@
         "hallucination_risk": "MEDIUM",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.9862,
+        "context_precision": 1.0,
+        "context_recall": 1.0
       },
       {
         "query": "How does two-stage retrieval balance latency and accuracy?",
@@ -6482,10 +6482,10 @@
         "hallucination_risk": "LOW",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.9905,
+        "context_precision": 1.0,
+        "context_recall": 1.0
       },
       {
         "query": "What is multi-agent consensus in RAG?",
@@ -6504,10 +6504,10 @@
         "hallucination_risk": "LOW",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.9365,
+        "context_precision": 0.5833,
+        "context_recall": 1.0
       },
       {
         "query": "How does multi-agent consensus improve answer reliability?",
@@ -6526,10 +6526,10 @@
         "hallucination_risk": "MEDIUM",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 1.0,
+        "context_precision": 1.0,
+        "context_recall": 1.0
       },
       {
         "query": "How many LLM instances are typically used in consensus?",
@@ -6548,10 +6548,10 @@
         "hallucination_risk": "LOW",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.8576,
+        "context_precision": 1.0,
+        "context_recall": 1.0
       },
       {
         "query": "How is the best answer selected from multiple candidates?",
@@ -6570,10 +6570,10 @@
         "hallucination_risk": "MEDIUM",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.7643,
+        "context_precision": 1.0,
+        "context_recall": 1.0
       },
       {
         "query": "What additional verification step strengthens trust after consensus?",
@@ -6592,10 +6592,10 @@
         "hallucination_risk": "LOW",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.6964,
+        "context_precision": 1.0,
+        "context_recall": 0.5
       },
       {
         "query": "Explain the full RAG retrieval-to-answer pipeline including reranking and consensus.",
@@ -6614,10 +6614,10 @@
         "hallucination_risk": "MEDIUM",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.6601,
+        "context_precision": 1.0,
+        "context_recall": 1.0
       },
       {
         "query": "How does INT4 quantization like GPTQ preserve accuracy compared to naive quantization?",
@@ -6636,10 +6636,10 @@
         "hallucination_risk": "MEDIUM",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.8275,
+        "context_precision": 1.0,
+        "context_recall": 1.0
       }
     ]
   },
@@ -6668,10 +6668,10 @@
         "hallucination_risk": "MEDIUM",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.6643,
+        "context_precision": 1.0,
+        "context_recall": 1.0
       },
       {
         "query": "How does RAG reduce hallucinations in LLM outputs?",
@@ -6690,10 +6690,10 @@
         "hallucination_risk": "LOW",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.7286,
+        "context_precision": 0.4167,
+        "context_recall": 1.0
       },
       {
         "query": "What are the main components of a modern RAG pipeline?",
@@ -6712,10 +6712,10 @@
         "hallucination_risk": "HIGH",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.9482,
+        "context_precision": 0.3333,
+        "context_recall": 1.0
       },
       {
         "query": "Why is RAG widely used in enterprise applications?",
@@ -6734,10 +6734,10 @@
         "hallucination_risk": "MEDIUM",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.8862,
+        "context_precision": 0.5833,
+        "context_recall": 1.0
       },
       {
         "query": "What technique does RAG use to retrieve relevant information?",
@@ -6756,10 +6756,10 @@
         "hallucination_risk": "LOW",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.5925,
+        "context_precision": 1.0,
+        "context_recall": 1.0
       },
       {
         "query": "What is a vector database used for?",
@@ -6778,10 +6778,10 @@
         "hallucination_risk": "LOW",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.9743,
+        "context_precision": 0.5,
+        "context_recall": 1.0
       },
       {
         "query": "How does Qdrant perform fast similarity search?",
@@ -6800,10 +6800,10 @@
         "hallucination_risk": "MEDIUM",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.883,
+        "context_precision": 1.0,
+        "context_recall": 1.0
       },
       {
         "query": "What are some popular vector databases besides Qdrant?",
@@ -6822,10 +6822,10 @@
         "hallucination_risk": "MEDIUM",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.8881,
+        "context_precision": 1.0,
+        "context_recall": 1.0
       },
       {
         "query": "What distance metrics are commonly used in vector databases?",
@@ -6844,10 +6844,10 @@
         "hallucination_risk": "LOW",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.9774,
+        "context_precision": 1.0,
+        "context_recall": 1.0
       },
       {
         "query": "What indexing algorithm does Qdrant use?",
@@ -6866,10 +6866,10 @@
         "hallucination_risk": "MEDIUM",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.8209,
+        "context_precision": 1.0,
+        "context_recall": 1.0
       },
       {
         "query": "What is RAGAS and what does it measure?",
@@ -6888,10 +6888,10 @@
         "hallucination_risk": "MEDIUM",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.9009,
+        "context_precision": 1.0,
+        "context_recall": 1.0
       },
       {
         "query": "How does faithfulness differ from answer relevancy?",
@@ -6910,10 +6910,10 @@
         "hallucination_risk": "MEDIUM",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.8327,
+        "context_precision": 0.3333,
+        "context_recall": 1.0
       },
       {
         "query": "What is a typical good faithfulness score for a RAG pipeline?",
@@ -6932,10 +6932,10 @@
         "hallucination_risk": "LOW",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.9731,
+        "context_precision": 1.0,
+        "context_recall": 1.0
       },
       {
         "query": "How is hallucination risk typically assessed?",
@@ -6954,10 +6954,10 @@
         "hallucination_risk": "LOW",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.9768,
+        "context_precision": 0.75,
+        "context_recall": 1.0
       },
       {
         "query": "What does context precision evaluate?",
@@ -6976,10 +6976,10 @@
         "hallucination_risk": "MEDIUM",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 1.0,
+        "context_precision": 1.0,
+        "context_recall": 1.0
       },
       {
         "query": "What is cross-encoder reranking?",
@@ -6998,10 +6998,10 @@
         "hallucination_risk": "LOW",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.9275,
+        "context_precision": 1.0,
+        "context_recall": 1.0
       },
       {
         "query": "How does two-stage retrieval work?",
@@ -7020,10 +7020,10 @@
         "hallucination_risk": "MEDIUM",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.9783,
+        "context_precision": 0.45,
+        "context_recall": 1.0
       },
       {
         "query": "Why are cross-encoders more accurate than bi-encoders?",
@@ -7042,10 +7042,10 @@
         "hallucination_risk": "MEDIUM",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 1.0,
+        "context_precision": 1.0,
+        "context_recall": 1.0
       },
       {
         "query": "What cross-encoder models are mentioned?",
@@ -7064,10 +7064,10 @@
         "hallucination_risk": "MEDIUM",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 1.0,
+        "context_precision": 1.0,
+        "context_recall": 1.0
       },
       {
         "query": "How does two-stage retrieval balance latency and accuracy?",
@@ -7086,10 +7086,10 @@
         "hallucination_risk": "LOW",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 1.0,
+        "context_precision": 1.0,
+        "context_recall": 1.0
       },
       {
         "query": "What is multi-agent consensus in RAG?",
@@ -7108,10 +7108,10 @@
         "hallucination_risk": "MEDIUM",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.7199,
+        "context_precision": 1.0,
+        "context_recall": 1.0
       },
       {
         "query": "How does multi-agent consensus improve answer reliability?",
@@ -7130,10 +7130,10 @@
         "hallucination_risk": "MEDIUM",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 1.0,
+        "context_precision": 1.0,
+        "context_recall": 1.0
       },
       {
         "query": "How many LLM instances are typically used in consensus?",
@@ -7152,10 +7152,10 @@
         "hallucination_risk": "LOW",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.8807,
+        "context_precision": 1.0,
+        "context_recall": 1.0
       },
       {
         "query": "How is the best answer selected from multiple candidates?",
@@ -7174,10 +7174,10 @@
         "hallucination_risk": "MEDIUM",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.3754,
+        "context_precision": 0.75,
+        "context_recall": 1.0
       },
       {
         "query": "What additional verification step strengthens trust after consensus?",
@@ -7196,10 +7196,10 @@
         "hallucination_risk": "LOW",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.6952,
+        "context_precision": 0.9167,
+        "context_recall": 0.5
       },
       {
         "query": "Explain the full RAG retrieval-to-answer pipeline including reranking and consensus.",
@@ -7218,10 +7218,10 @@
         "hallucination_risk": "MEDIUM",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.6044,
+        "context_precision": 0.7222,
+        "context_recall": 1.0
       },
       {
         "query": "How does INT4 quantization like GPTQ preserve accuracy compared to naive quantization?",
@@ -7240,10 +7240,10 @@
         "hallucination_risk": "MEDIUM",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.9661,
+        "context_precision": 1.0,
+        "context_recall": 1.0
       }
     ]
   },
@@ -7272,10 +7272,10 @@
         "hallucination_risk": "MEDIUM",
         "error": null,
         "grounding_score": null,
-        "faithfulness": null,
-        "answer_relevancy": null,
-        "context_precision": null,
-        "context_recall": null
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.859,
+        "context_precision": 1.0,
+        "context_recall": 1.0
       },
       {
         "query": "How does RAG reduce hallucinations in LLM outputs?",
