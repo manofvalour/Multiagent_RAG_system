@@ -50,9 +50,6 @@ class RAGASEvaluator:
                         client=client)
 
         EMBEDDING_MODEL_NAME = 'sentence-transformers/all-MiniLM-L6-v2'
-        #hf_embeddings = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL_NAME)
-        #self.embeddings = LangchainEmbeddingsWrapper(hf_embeddings)
-
         self.embeddings = HuggingFaceEmbeddings(model=EMBEDDING_MODEL_NAME)
 
     async def evaluate(self, query:str,
