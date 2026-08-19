@@ -21,8 +21,6 @@ from ragas.llms import llm_factory
 from google import genai
 from openai import OpenAI, AsyncOpenAI
 from ragas.embeddings import HuggingFaceEmbeddings
-#from langchain_huggingface import HuggingFaceEmbeddings
-#from ragas.embeddings import LangchainEmbeddingsWrapper
 
 
 settings = get_settings()

@@ -106,12 +106,11 @@ class RerankerConfig(BaseModel):
     enabled: bool = True
     top_n:int = 5
     model:str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
-            #"Alibaba-NLP/gte-reranker-modernbert-base", 
 
 class QueryExpansionConfig(BaseModel):
     """HyDE / multi-query rewriting before retrieval."""
     enabled: bool = True
-    strategy: ExpansionStrategy = ExpansionStrategy.BOTH
+    strategy: ExpansionStrategy = ExpansionStrategy.HYDE # ExpansionStrategy.BOTH
     num_queries: int = 3
     hyde_temperature: float = 0.7
     timeout_seconds: int = Field(default=15, ge=1)
@@ -233,7 +232,7 @@ class EvaluationConfig(BaseModel):
 
 class AgentConfig(BaseModel):
     """Multi-agent pipeline thresholds."""
-    consensus_n_agents:int = 3
+    consensus_n_agents:int = 1 #3
     retrieval_relevance_threshold: float = 0.12
     claim_support_threshold: float = 0.20
     confidence_low_threshold: float = 0.70
@@ -297,7 +296,7 @@ class Settings(BaseSettings):
     active_provider: LLMProvider = LLMProvider.GEMINI
     llm_providers: dict[str, LLMProviderConfig] = {
         "groq": LLMProviderConfig(
-            model_name="openai/gpt-oss-120b", #"qwen/qwen3.6-27b", #
+            model_name="openai/gpt-oss-120b",
             base_url="https://api.groq.com/openai/v1/chat/completions",
         ),
         "anthropic": LLMProviderConfig(
