@@ -29,7 +29,7 @@ from langsmith import traceable
 from multiagent_rag_system.src.cache.cache import SemanticCache
 
 from ..agents.query_expansion import QueryExpansionAgent
-from ..agents.evaluator import RAGASEvaluator
+#from ..agents.evaluator import RAGASEvaluator
 from ..agents.confidence_score_agent import ConfidenceScoringAgent
 from ..agents.consensus_agent import ConsensusAgent
 from ..agents.claim_verification_agent import ClaimVerificationAgent
@@ -44,8 +44,8 @@ class RAGOrchestrator:
     def __init__(
         self, expansion=QueryExpansionAgent(), retriever= ChunkRetrieval(), 
         reranker=RerankerAgent(), consensus=ConsensusAgent(), cache=SemanticCache(), 
-        evaluator= RAGASEvaluator(), confidence_score= ConfidenceScoringAgent(),
-        claim_verification= ClaimVerificationAgent()
+        confidence_score= ConfidenceScoringAgent(), claim_verification= ClaimVerificationAgent(),
+        #evaluator= RAGASEvaluator(),
     ) -> None:
         
         self.expansion = expansion
