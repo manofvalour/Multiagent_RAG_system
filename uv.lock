@@ -2339,7 +2339,7 @@ requires-dist = [
     { name = "python-pptx", specifier = ">=1.0.2" },
     { name = "pyyaml", specifier = ">=6.0.3" },
     { name = "qdrant-client", specifier = ">=1.17.1" },
-    { name = "ragas", specifier = ">=0.4.3" },
+    { name = "ragas", specifier = ">=0.3.9" },
     { name = "redis", specifier = ">=7.4.0" },
     { name = "sentence-transformers", specifier = ">=5.4.0" },
     { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0.49" },

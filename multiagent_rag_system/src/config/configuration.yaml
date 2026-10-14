@@ -32,7 +32,7 @@ redis:
   similarity_threshold: 0.92    # reuse cached answer if query is ≥92% similar
 
 llm:
-  active_provider: 'groq'
+  active_provider: 'gemini'
   system_prompt: |
     You are a precise, helpful assistant.
     Answer the question using ONLY the provided context.
@@ -70,10 +70,12 @@ vector_store:
   qdrant_index_path: "./data/qdrant"
   top_k_retrieval: 15
   qdrant_url: "http://localhost:6333"
-  collection_name: "multi_agent_rag_system"
+  collection_name: "rag_chunks"
   hnsw_m: 16                  
   hnsw_ef_construct: 128        
   hnsw_ef: 128            
+
+
 
 
 agents_info:

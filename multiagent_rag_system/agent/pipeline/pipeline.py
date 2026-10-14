@@ -55,7 +55,7 @@ class RAGOrchestrator:
         self.confidence_scorer = confidence_score
         self.claim_verifier = claim_verification
         self.cache = cache
-        #self.evaluator = evaluator
+       # self.evaluator = evaluator
 
     @traced("orchestrator.run")
     async def run(self, query: QueryRequest) -> QueryResponse:
@@ -209,9 +209,9 @@ class RAGOrchestrator:
 
         # Post-stream: cache + fire-and-forget evaluation
         await self.cache.set(query.query, response)
-        asyncio.create_task(
-            self.evaluator.evaluate(query.query, answer, reranked)
-        )
+       # asyncio.create_task(
+        #    self.evaluator.evaluate(query.query, answer, reranked)
+        #)
 
         logger.info(
             f"[Orchestrator] streamed  retrieved={len(retrieved)} | reranked={len(reranked)}  "

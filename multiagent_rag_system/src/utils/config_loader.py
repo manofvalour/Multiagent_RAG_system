@@ -293,7 +293,7 @@ class Settings(BaseSettings):
     #jwt_secret:SecretStr = Field(default="", alias="JWT_SECRET")
 
     # ── LLM provider registry ──────────────────────────────────────────────
-    active_provider: LLMProvider = LLMProvider.GEMINI
+    active_provider: LLMProvider = LLMProvider.GROQ
     llm_providers: dict[str, LLMProviderConfig] = {
         "groq": LLMProviderConfig(
             model_name="openai/gpt-oss-120b",
