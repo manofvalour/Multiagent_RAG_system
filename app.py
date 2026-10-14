@@ -4,8 +4,9 @@ Routes: /query,/ingest_text, /ingest_file, /delete_documents, /health, /metrics,
 Middleware: CORS, rate-limiting, request-id injection, structured logging
 """
 
-print("DEBUG: Starting app.py import", flush=True)
 from __future__ import annotations
+
+print("DEBUG: Starting app.py import", flush=True)
 import asyncio
 import time
 import uuid
