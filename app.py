@@ -6,7 +6,6 @@ Middleware: CORS, rate-limiting, request-id injection, structured logging
 
 from __future__ import annotations
 
-print("DEBUG: Starting app.py import", flush=True)
 import asyncio
 import time
 import uuid
@@ -38,8 +37,6 @@ from multiagent_rag_system.src.utils.metrics import (
     get_metrics_output, record_ingestion, record_query, 
     track_request, update_store_size
 )
-
-print("DEBUG: All imports completed", flush=True)
 
 settings = get_settings()
 config = settings.server
@@ -94,7 +91,6 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
 )
-print("DEBUG: FastAPI app created", flush=True)
 
 #Middleware
 app.add_middleware(
