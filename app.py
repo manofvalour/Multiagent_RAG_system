@@ -3,6 +3,8 @@ app.py -- FastAPI application
 Routes: /query,/ingest_text, /ingest_file, /delete_documents, /health, /metrics, /analytics
 Middleware: CORS, rate-limiting, request-id injection, structured logging
 """
+
+print("DEBUG: Starting app.py import", flush=True)
 from __future__ import annotations
 import asyncio
 import time
@@ -36,6 +38,7 @@ from multiagent_rag_system.src.utils.metrics import (
     track_request, update_store_size
 )
 
+print("DEBUG: All imports completed", flush=True)
 
 settings = get_settings()
 config = settings.server
@@ -90,6 +93,7 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
 )
+print("DEBUG: FastAPI app created", flush=True)
 
 #Middleware
 app.add_middleware(
